@@ -1,2 +1,278 @@
 # gex-trading-dashboard
 GEX Trading Dashboard - $100K Mock Account with Databricks Integration
+
+
+# 🎯 GEX Trading Strategy Dashboard
+
+A comprehensive Streamlit dashboard for **Gamma Exposure (GEX) trading strategies** with integrated **$100K mock trading account** and **Databricks pipeline integration**.
+
+## 🌅 Features
+
+### 📚 **Educational Strategy Guide**
+- Complete explanation of GEX trading in simple terms
+- Visual examples of gamma flip mechanics
+- 3 main strategies: Squeeze Plays, Premium Selling, Volatility Plays
+- Confidence scoring system (70-100%)
+
+### 💰 **$100K Mock Trading Account**
+- **Realistic portfolio tracking** with 2% risk per trade
+- **Execute trades** based on morning analysis
+- **Performance analytics** by setup type
+- **Win/loss tracking** with detailed metrics
+- **All data stored in Databricks** for enterprise-grade analytics
+
+### 🌅 **Morning Pipeline Integration**
+- **Connects to your ScheduledMorningGEXPipeline** (6:00-8:30 AM Central)
+- **Real opportunities** from your dynamic universe (125+ symbols)
+- **Priority-based rankings** (P1, P2) from your algorithm
+- **Category breakdowns** (Crypto, Biotech, Meme, Weekly Focus)
+- **Live confidence scores** from your analysis
+
+### 📊 **Advanced Analytics**
+- Performance by setup type (Squeeze vs Call Selling vs Straddles)
+- Win rate analysis by confidence level
+- Risk-adjusted returns and Sharpe ratios
+- Drawdown monitoring and portfolio optimization
+
+## 🚀 Quick Start
+
+### **Option 1: Deploy to Streamlit Cloud (Recommended)**
+
+1. **Fork this repository** to your GitHub account
+
+2. **Go to [share.streamlit.io](https://share.streamlit.io/)**
+
+3. **Click "New app"** and connect your forked repository
+
+4. **Add your Databricks secrets** in the Streamlit Cloud settings:
+   ```toml
+   [secrets]
+   databricks_hostname = "your-workspace.cloud.databricks.com"
+   databricks_http_path = "/sql/1.0/warehouses/your-warehouse-id"
+   databricks_token = "your-databricks-token"
+   ```
+
+5. **Deploy!** Your app will be live at `https://your-app-name.streamlit.app`
+
+### **Option 2: Run Locally**
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/gex-trading-dashboard.git
+cd gex-trading-dashboard
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create secrets file
+mkdir .streamlit
+echo '[secrets]
+databricks_hostname = "your-workspace.cloud.databricks.com"
+databricks_http_path = "/sql/1.0/warehouses/your-warehouse-id"
+databricks_token = "your-token"' > .streamlit/secrets.toml
+
+# Run the app
+streamlit run gex_dashboard.py
+```
+
+## 🔗 Databricks Integration
+
+### **Create Required Tables**
+
+Run this SQL in your Databricks workspace:
+
+```sql
+-- Table for storing pipeline results
+CREATE TABLE IF NOT EXISTS gex_trading.scheduled_pipeline_results (
+    run_id STRING,
+    analysis_date DATE,
+    analysis_timestamp TIMESTAMP,
+    symbol STRING,
+    spot_price DOUBLE,
+    gamma_flip_point DOUBLE,
+    distance_to_flip DOUBLE,
+    distance_to_flip_pct DOUBLE,
+    structure_type STRING,
+    confidence_score INT,
+    recommendation STRING,
+    category STRING,
+    priority INT,
+    scheduled_analysis BOOLEAN,
+    interval_number INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+) USING DELTA
+PARTITIONED BY (analysis_date);
+
+-- Table for mock trading account
+CREATE TABLE IF NOT EXISTS gex_trading.mock_trades (
+    trade_id STRING,
+    user_id STRING DEFAULT 'mock_trader',
+    symbol STRING,
+    trade_type STRING,
+    entry_timestamp TIMESTAMP,
+    entry_price DOUBLE,
+    quantity INT,
+    confidence_score INT,
+    setup_type STRING,
+    recommendation STRING,
+    status STRING DEFAULT 'OPEN',
+    profit_loss DOUBLE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+) USING DELTA
+PARTITIONED BY (DATE(entry_timestamp));
+
+-- Table for portfolio tracking
+CREATE TABLE IF NOT EXISTS gex_trading.mock_portfolio_history (
+    portfolio_id STRING,
+    user_id STRING DEFAULT 'mock_trader',
+    snapshot_date DATE,
+    total_value DOUBLE,
+    cash_balance DOUBLE,
+    positions_value DOUBLE,
+    total_return_pct DOUBLE,
+    win_rate DOUBLE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+) USING DELTA
+PARTITIONED BY (snapshot_date);
+```
+
+### **Connect Your ScheduledMorningGEXPipeline**
+
+Add this method to your existing pipeline to save results:
+
+```python
+def save_opportunity_to_databricks(self, opportunity: Dict, interval_num: int, run_id: str):
+    """Save opportunity to Databricks for Streamlit dashboard"""
+    try:
+        from databricks import sql
+        
+        connection = sql.connect(
+            server_hostname=self.databricks_hostname,
+            http_path=self.databricks_http_path,
+            access_token=self.databricks_token
+        )
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO gex_trading.scheduled_pipeline_results VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+            """, (
+                run_id,
+                datetime.now().date(),
+                datetime.now(),
+                opportunity['symbol'],
+                opportunity['spot_price'],
+                opportunity['gamma_flip_point'],
+                opportunity['distance_to_flip'],
+                opportunity['distance_to_flip_pct'],
+                opportunity['structure_type'],
+                opportunity['confidence_score'],
+                opportunity['recommendation'],
+                opportunity['category'],
+                opportunity['priority'],
+                opportunity['scheduled_analysis'],
+                interval_num,
+                datetime.now()
+            ))
+            
+    except Exception as e:
+        print(f"⚠️ Databricks save error: {e}")
+```
+
+## 📊 Dashboard Pages
+
+### **🎓 Learn the Strategy**
+- Complete GEX trading education
+- Market maker psychology explained
+- Visual examples with real scenarios
+- Why the strategies work
+
+### **🌅 Morning Analysis**  
+- Live opportunities from your 6AM-8:30AM pipeline
+- Priority-ranked picks with confidence scores
+- Interactive gamma flip visualization
+- Category-based filtering
+
+### **💰 Mock Trading Account**
+- $100K starting balance
+- Execute trades with proper position sizing
+- Real-time P&L tracking
+- Performance analytics dashboard
+
+### **📊 Performance Tracking**
+- Win rates by setup type
+- Average returns per trade category
+- Risk-adjusted performance metrics
+- Historical portfolio value charts
+
+## 🎯 Strategy Overview
+
+### **🚀 Squeeze Plays (Long Calls)**
+- **When:** Price below gamma flip point
+- **Why:** Market makers buy when price rises → explosive moves
+- **Target:** 100%+ returns on momentum
+
+### **💰 Premium Selling (Sell Calls)**  
+- **When:** Price above gamma flip point
+- **Why:** Market makers sell when price rises → resistance
+- **Target:** 50% premium collection
+
+### **⚖️ Volatility Plays (Straddles)**
+- **When:** Price at gamma flip point  
+- **Why:** Maximum uncertainty → big moves either direction
+- **Target:** Profit from volatility expansion
+
+## 🔐 Security
+
+- All sensitive data stored in Streamlit secrets
+- Databricks tokens use personal access tokens (not passwords)
+- No hardcoded credentials in code
+- Environment-specific configuration
+
+## 📈 Performance Tracking
+
+The dashboard tracks:
+- **Win Rate** by setup type and confidence level
+- **Average Return** per trade category  
+- **Risk Metrics** including maximum drawdown
+- **Hold Period Analysis** for optimal timing
+- **Category Performance** (Crypto vs Biotech vs Meme stocks)
+
+## 🛠️ Development
+
+### **Project Structure**
+```
+gex-trading-dashboard/
+├── gex_dashboard.py          # Main Streamlit application
+├── requirements.txt          # Python dependencies
+├── README.md                # This file
+├── .streamlit/
+│   └── secrets.toml         # Local secrets (not committed)
+└── .gitignore               # Git ignore file
+```
+
+### **Contributing**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test locally
+5. Submit a pull request
+
+## 📞 Support
+
+- **Strategy Questions:** Refer to the "Learn the Strategy" tab in the app
+- **Technical Issues:** Check the Databricks Integration Guide in the app
+- **Pipeline Integration:** Follow the step-by-step setup guide
+
+## 🎯 Next Steps
+
+1. **Deploy to Streamlit Cloud** for permanent access
+2. **Connect your Databricks pipeline** for real data
+3. **Start mock trading** with the $100K account
+4. **Track performance** and refine strategies
+5. **Scale to real trading** once comfortable with results
+
+---
+
+**🚀 Turn market maker psychology into profits with quantified GEX analysis!**
