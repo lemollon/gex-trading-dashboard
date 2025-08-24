@@ -1578,7 +1578,32 @@ def main():
                     'realized_pnl': 'sum'
                 }).round(2)
                 
-                strategy_stats.columns = ['Count', 'Avg Return %', 'Win Rate %', 'Avg Days', 'Total P&L ]
+                strategy_stats.columns = ['Count', 'Avg Return %', 'Win Rate %', 'Avg Days', 'Total P&L 
+                
+                st.dataframe(strategy_stats, use_container_width=True)
+                
+                # Performance chart by strategy
+                fig = px.bar(
+                    df.groupby('setup_type')['realized_pnl_pct'].mean().reset_index(),
+                    x='setup_type', 
+                    y='realized_pnl_pct',
+                    title="Average Return by Strategy Type",
+                    color='realized_pnl_pct',
+                    color_continuous_scale="RdYlGn",
+                    labels={'setup_type': 'Strategy Type', 'realized_pnl_pct': 'Average Return %'}
+                )
+                
+                fig.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white')
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+
+if __name__ == "__main__":
+    main()]
                 
                 st.dataframe(strategy_stats, use_container_width=True)
                 
