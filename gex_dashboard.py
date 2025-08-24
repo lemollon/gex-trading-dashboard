@@ -278,4 +278,43 @@ class DatabricksMockAccount:
         """Initialize Databricks Delta tables for portfolio tracking"""
         
         create_trades_table = """
-        CREATE TABLE IF NOT EXISTS g
+        CREATE TABLE IF NOT EXISTS gex_trading.mock_trades (
+            trade_id STRING,
+            user_id STRING,
+            symbol STRING,
+            trade_type STRING,
+            entry_timestamp TIMESTAMP,
+            entry_date DATE,
+            entry_price DOUBLE,
+            quantity INT,
+            confidence_score INT,
+            setup_type STRING,
+            recommendation STRING,
+            status STRING,
+            created_at TIMESTAMP
+        ) USING DELTA
+        PARTITIONED BY (entry_date)
+        """
+        
+        create_portfolio_table = """
+        CREATE TABLE IF NOT EXISTS gex_trading.mock_portfolio_history (
+            portfolio_id STRING,
+            user_id STRING,
+            snapshot_date DATE,
+            snapshot_timestamp TIMESTAMP,
+            total_value DOUBLE,
+            cash_balance DOUBLE,
+            positions_value DOUBLE,
+            total_return_pct DOUBLE,
+            open_positions_count INT,
+            win_rate DOUBLE,
+            created_at TIMESTAMP
+        ) USING DELTA
+        PARTITIONED BY (snapshot_date)
+        """
+        
+        # Store these for reference - you'd run them in Databricks
+        self.table_creation_sql = {
+            'trades': create_trades_table,
+            'portfolio': create_portfolio_table
+        }
