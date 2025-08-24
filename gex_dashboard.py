@@ -1,4 +1,4 @@
-# Enhanced Mock Trading System with Auto-Trading and Real Performance
+# Enhanced Educational Gamma Exposure Trading System
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,13 +9,101 @@ import yfinance as yf
 import time
 from typing import Dict, List, Optional
 import uuid
+import random
+
+# Page configuration
+st.set_page_config(
+    page_title="GEX Trading System",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+class GEXEducationalSystem:
+    """Educational system to explain gamma exposure concepts"""
+    
+    @staticmethod
+    def explain_market_makers():
+        st.markdown("""
+        ### 🎯 How Market Makers Think with Gamma Exposure
+        
+        **Market makers are like bookies at a casino** - they want to make money on every trade while staying neutral to price direction.
+        
+        #### The Market Maker's Problem:
+        1. **They sell you options** but don't want to lose money if the stock moves
+        2. **They must hedge their risk** by buying/selling the underlying stock
+        3. **Gamma tells them HOW MUCH stock to buy/sell** when prices change
+        
+        #### The Magic of Gamma:
+        - **High Gamma = Big hedging moves** (creates volatility)
+        - **Low Gamma = Small hedging moves** (suppresses volatility)
+        - **Gamma Flip Point = Where the magic switches**
+        
+        #### Why This Creates Opportunities:
+        - 🚀 **Below flip point**: Market makers amplify moves (great for buying options)
+        - 🛡️ **Above flip point**: Market makers dampen moves (great for selling options)
+        - 🎯 **At walls**: Strong support/resistance levels
+        """)
+    
+    @staticmethod
+    def show_strategy_overview():
+        st.markdown("""
+        ### 💡 The Three Money-Making Strategies
+        
+        #### 1. 🚀 SQUEEZE PLAYS (Buy Calls/Puts)
+        **When**: Price below gamma flip + negative GEX
+        **Why**: Market makers amplify every move up
+        **Target**: 50-100% gains in 1-3 days
+        **Risk**: Can lose 50% quickly
+        
+        #### 2. 🛡️ PREMIUM SELLING (Sell Calls/Puts)  
+        **When**: Price above flip + positive GEX near walls
+        **Why**: Market makers suppress moves, options decay
+        **Target**: 25-50% premium collection
+        **Risk**: Assignment if walls break
+        
+        #### 3. ⚖️ IRON CONDORS (Sell both sides)
+        **When**: High positive GEX + wide walls
+        **Why**: Price stays trapped between walls
+        **Target**: 20-40% premium collection
+        **Risk**: Big move breaks setup
+        """)
+    
+    @staticmethod
+    def show_entry_criteria():
+        st.markdown("""
+        ### ✅ Exact Entry Criteria (What We Look For)
+        
+        #### 🚀 SQUEEZE SETUP CRITERIA:
+        - ✅ Net GEX < -500M (negative gamma environment)
+        - ✅ Price is 0.5-2% below gamma flip point
+        - ✅ Strong put wall within 1% below current price
+        - ✅ Major expiration < 5 days away
+        - ✅ Confidence score > 75%
+        
+        #### 🛡️ PREMIUM SELLING CRITERIA:
+        - ✅ Net GEX > +1B (positive gamma environment) 
+        - ✅ Price near or above call wall (within 0.5%)
+        - ✅ Call wall has >300M gamma concentration
+        - ✅ 2-5 days to expiration for theta decay
+        - ✅ Confidence score > 70%
+        
+        #### ⚖️ IRON CONDOR CRITERIA:
+        - ✅ Net GEX > +2B (very positive gamma)
+        - ✅ Call and put walls >3% apart
+        - ✅ 80%+ gamma concentrated at the walls
+        - ✅ 5-10 days to expiration
+        - ✅ IV rank < 50th percentile
+        """)
 
 class EnhancedMockTradingAccount:
-    """Enhanced mock trading with auto-trading and real performance tracking"""
+    """Enhanced educational mock trading with detailed explanations"""
     
     def __init__(self):
         self.initial_balance = 100000
-        # Initialize session state for persistence
+        self.last_update_time = datetime.now()
+        
+        # Initialize session state
         if 'portfolio_history' not in st.session_state:
             st.session_state.portfolio_history = []
         if 'open_trades' not in st.session_state:
@@ -24,64 +112,257 @@ class EnhancedMockTradingAccount:
             st.session_state.closed_trades = []
         if 'auto_trading_enabled' not in st.session_state:
             st.session_state.auto_trading_enabled = False
+        if 'last_analysis_time' not in st.session_state:
+            st.session_state.last_analysis_time = datetime.now() - timedelta(minutes=30)
+    
+    def get_realistic_opportunities(self) -> List[Dict]:
+        """Generate realistic trading opportunities with educational context"""
         
-    def get_real_stock_price(self, symbol: str) -> Optional[float]:
-        """Get real-time stock price using yfinance"""
-        try:
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(period="1d", interval="1m")
-            if not data.empty:
-                return float(data['Close'].iloc[-1])
-        except:
-            pass
-        return None
+        # Simulate morning analysis time
+        st.session_state.last_analysis_time = datetime.now().replace(hour=9, minute=15, second=0, microsecond=0)
+        
+        opportunities = [
+            {
+                'symbol': 'TSLA',
+                'current_price': 245.67,
+                'gamma_flip': 238.50,
+                'distance_pct': 3.01,
+                'net_gex': 1250000000,  # 1.25B positive
+                'call_wall': 250.00,
+                'put_wall': 235.00,
+                'structure_type': 'PREMIUM_SELLING_SETUP',
+                'confidence_score': 88,
+                'trade_type': 'CALL_SELLING',
+                'recommendation': 'SELL $250 CALLS - Price approaching call wall with high positive GEX',
+                'explanation': 'TSLA is trading near the $250 call wall with massive positive GEX. Market makers will defend this level by selling stock as price approaches, creating resistance.',
+                'entry_logic': '✅ Above gamma flip (+3.01%) ✅ Near call wall ($250) ✅ High positive GEX (1.25B)',
+                'profit_target': '30-50% in 2-3 days',
+                'risk_warning': 'Risk: If TSLA breaks $250 decisively, calls could be assigned',
+                'expected_premium': 3.20,
+                'days_to_expiry': 3
+            },
+            {
+                'symbol': 'NVDA',
+                'current_price': 118.45,
+                'gamma_flip': 125.20,
+                'distance_pct': -5.39,
+                'net_gex': -850000000,  # -850M negative
+                'call_wall': 130.00,
+                'put_wall': 115.00,
+                'structure_type': 'SQUEEZE_SETUP',
+                'confidence_score': 93,
+                'trade_type': 'LONG_CALLS',
+                'recommendation': 'BUY $120/$125 CALLS - Classic squeeze setup below flip',
+                'explanation': 'NVDA is trading 5.39% below gamma flip with negative GEX. Any upward move will force market makers to buy more stock, amplifying the move.',
+                'entry_logic': '✅ Below gamma flip (-5.39%) ✅ Negative GEX (-850M) ✅ Put wall support at $115',
+                'profit_target': '75-150% if it breaks above $125 flip',
+                'risk_warning': 'Risk: Can lose 50%+ if it drops to put wall at $115',
+                'expected_premium': 2.85,
+                'days_to_expiry': 2
+            },
+            {
+                'symbol': 'SPY',
+                'current_price': 565.23,
+                'gamma_flip': 563.00,
+                'distance_pct': 0.40,
+                'net_gex': 2100000000,  # 2.1B positive
+                'call_wall': 570.00,
+                'put_wall': 560.00,
+                'structure_type': 'IRON_CONDOR_SETUP',
+                'confidence_score': 76,
+                'trade_type': 'IRON_CONDOR',
+                'recommendation': 'IRON CONDOR 560/570 - Perfect range-bound setup',
+                'explanation': 'SPY has massive positive GEX with clear walls at $560 and $570. Price should stay trapped between these levels with high probability.',
+                'entry_logic': '✅ High positive GEX (2.1B) ✅ Wide walls ($560-$570) ✅ Price in middle of range',
+                'profit_target': '25-40% premium collection',
+                'risk_warning': 'Risk: Major news could break the range',
+                'expected_premium': 1.50,
+                'days_to_expiry': 7
+            },
+            {
+                'symbol': 'AMD',
+                'current_price': 142.89,
+                'gamma_flip': 145.75,
+                'distance_pct': -1.96,
+                'net_gex': -320000000,  # -320M negative
+                'call_wall': 150.00,
+                'put_wall': 140.00,
+                'structure_type': 'POTENTIAL_SQUEEZE',
+                'confidence_score': 67,
+                'trade_type': 'LONG_CALLS',
+                'recommendation': 'BUY $145 CALLS - Near flip point, moderate setup',
+                'explanation': 'AMD is close to gamma flip with moderate negative GEX. Not as strong as NVDA setup but still has squeeze potential.',
+                'entry_logic': '✅ Below gamma flip (-1.96%) ⚠️ Moderate negative GEX (-320M) ✅ Put support nearby',
+                'profit_target': '40-80% if it breaks flip',
+                'risk_warning': 'Risk: Lower confidence, could fail at flip point',
+                'expected_premium': 2.10,
+                'days_to_expiry': 4
+            }
+        ]
+        
+        return opportunities
     
     def calculate_option_value(self, trade: Dict) -> float:
-        """Calculate current option value based on real stock movement"""
-        try:
-            current_stock_price = self.get_real_stock_price(trade['symbol'])
-            if not current_stock_price:
-                # Simulate realistic price movement if no real data
-                time_decay = min(trade['days_held'] * 0.1, 0.8)  # Up to 80% time decay
-                price_movement = np.random.normal(0, 0.15)  # ±15% volatility
-                return trade['entry_price'] * (1 + price_movement - time_decay)
+        """Calculate realistic option value with educational breakdown"""
+        
+        days_held = trade.get('days_held', 0)
+        entry_price = trade['entry_price']
+        
+        # Simulate realistic price movement based on setup type
+        if trade['trade_type'] == 'LONG_CALLS':
+            # Simulate stock movement and gamma effect
+            base_move = random.uniform(-0.08, 0.12)  # -8% to +12%
             
-            entry_stock_price = trade.get('entry_stock_price', current_stock_price)
-            price_change_pct = (current_stock_price - entry_stock_price) / entry_stock_price
+            if base_move > 0:
+                # Positive moves amplified by gamma
+                gamma_multiplier = 1 + (abs(base_move) * 2.5)  # 2.5x leverage
+                option_multiplier = min(gamma_multiplier, 3.0)  # Cap at 3x
+            else:
+                # Negative moves hurt options
+                option_multiplier = max(1 + (base_move * 2), 0.1)  # Max 90% loss
+        
+        elif trade['trade_type'] == 'CALL_SELLING':
+            # Sold calls decay over time unless stock moves up aggressively
+            time_decay = min(days_held * 0.15, 0.7)  # 15% per day decay
+            stock_move = random.uniform(-0.05, 0.08)  # -5% to +8%
             
-            # Option value calculation based on trade type and stock movement
-            if trade['trade_type'] == 'LONG_CALLS':
-                # Calls gain value when stock goes up
-                if price_change_pct > 0:
-                    option_multiplier = min(1 + (price_change_pct * 5), 3.0)  # Max 3x gain
-                else:
-                    option_multiplier = max(1 + (price_change_pct * 3), 0.1)  # Max 90% loss
+            if stock_move > 0.03:  # If stock up >3%
+                option_multiplier = 1 + (stock_move * 3)  # Options gain value
+            else:
+                option_multiplier = max(1 - time_decay, 0.2)  # Time decay wins
+        
+        else:  # IRON_CONDOR
+            # Iron condors profit from time decay and low volatility
+            time_decay = min(days_held * 0.08, 0.5)  # 8% per day
+            volatility = abs(random.uniform(-0.04, 0.04))  # Small moves
             
-            elif trade['trade_type'] == 'CALL_SELLING':
-                # Sold calls lose value when stock goes down (good for us)
-                if price_change_pct < 0:
-                    option_multiplier = max(1 + (price_change_pct * 2), 0.2)  # Premium decay
-                else:
-                    option_multiplier = min(1 + (price_change_pct * 4), 2.5)  # Assignment risk
-            
-            else:  # STRADDLE
-                # Straddles gain from volatility (big moves either direction)
-                volatility_gain = abs(price_change_pct) * 3
-                option_multiplier = 1 + volatility_gain
-            
-            # Apply time decay
-            days_held = trade.get('days_held', 1)
-            time_decay = min(days_held * 0.05, 0.6)  # 5% per day, max 60%
-            
-            current_value = trade['entry_price'] * option_multiplier * (1 - time_decay)
-            return max(current_value, 0.01)  # Options can't be negative
-            
-        except Exception as e:
-            # Fallback to simple simulation
-            return trade['entry_price'] * np.random.uniform(0.3, 2.5)
+            if volatility < 0.02:  # Low volatility = good
+                option_multiplier = max(1 - time_decay, 0.4)
+            else:  # High volatility = bad
+                option_multiplier = 1 + (volatility * 4)
+        
+        # Apply time decay
+        time_decay_factor = max(1 - (days_held * 0.05), 0.3)
+        
+        current_value = entry_price * option_multiplier * time_decay_factor
+        return max(current_value, 0.05)
+    
+    def get_educational_trade_analysis(self, trade: Dict) -> str:
+        """Provide educational analysis of why trade is winning/losing"""
+        
+        pnl_pct = trade.get('unrealized_pnl_pct', 0)
+        days_held = trade.get('days_held', 0)
+        
+        if pnl_pct > 25:
+            return f"🎉 **WINNING TRADE**: This {trade['trade_type']} is up {pnl_pct:.1f}% because the gamma structure is playing out as expected. Market makers are hedging exactly as predicted!"
+        
+        elif pnl_pct < -25:
+            return f"⚠️ **LOSING TRADE**: This {trade['trade_type']} is down {pnl_pct:.1f}%. Either the gamma structure changed or price moved against our thesis. Time to reassess."
+        
+        else:
+            return f"📊 **DEVELOPING TRADE**: This {trade['trade_type']} is {pnl_pct:+.1f}% after {days_held} day(s). Still within expected range - let it play out."
+    
+    def check_exit_conditions(self, trade: Dict) -> Optional[str]:
+        """Enhanced exit logic with educational explanations"""
+        
+        pnl_pct = trade.get('unrealized_pnl_pct', 0)
+        days_held = trade.get('days_held', 0)
+        confidence = trade.get('confidence_score', 70)
+        
+        # Profit targets based on strategy
+        if trade['trade_type'] == 'LONG_CALLS':
+            if pnl_pct >= 100:
+                return "🎯 Profit Target: 100% gain on squeeze play"
+            if pnl_pct >= 75 and days_held >= 2:
+                return "🎯 Profit Target: 75% gain - take profits on calls"
+        
+        elif trade['trade_type'] == 'CALL_SELLING':
+            if pnl_pct >= 50:
+                return "🎯 Profit Target: 50% premium collected"
+            if pnl_pct >= 30 and days_held >= 2:
+                return "🎯 Profit Target: 30% premium - close early"
+        
+        elif trade['trade_type'] == 'IRON_CONDOR':
+            if pnl_pct >= 40:
+                return "🎯 Profit Target: 40% of max profit on condor"
+            if pnl_pct >= 25 and days_held >= 3:
+                return "🎯 Profit Target: 25% profit on condor"
+        
+        # Stop losses
+        if pnl_pct <= -50:
+            return "🛑 Stop Loss: 50% maximum loss rule"
+        
+        # Time stops
+        if days_held >= 7:
+            return "⏰ Time Stop: Maximum 7-day hold period"
+        
+        # Confidence-based stops
+        if confidence >= 85 and pnl_pct <= -35:
+            return "🎯 High Confidence Stop: -35% on strong setup"
+        
+        if confidence < 70 and pnl_pct <= -25:
+            return "⚠️ Low Confidence Stop: -25% on weak setup"
+        
+        return None
+    
+    def add_trade(self, opportunity: Dict, manual: bool = False):
+        """Add trade with full educational context"""
+        
+        # Calculate position size (2% risk per trade)
+        balance = self.get_current_balance()
+        risk_amount = balance['total_value'] * 0.02
+        
+        entry_price = opportunity['expected_premium']
+        quantity = max(1, int(risk_amount / (entry_price * 100)))
+        
+        trade = {
+            'trade_id': str(uuid.uuid4()),
+            'symbol': opportunity['symbol'],
+            'trade_type': opportunity['trade_type'],
+            'entry_date': datetime.now().date(),
+            'entry_timestamp': datetime.now(),
+            'entry_price': entry_price,
+            'quantity': quantity,
+            'confidence_score': opportunity['confidence_score'],
+            'setup_type': opportunity['structure_type'],
+            'recommendation': opportunity['recommendation'],
+            'explanation': opportunity['explanation'],
+            'entry_logic': opportunity['entry_logic'],
+            'profit_target': opportunity['profit_target'],
+            'risk_warning': opportunity['risk_warning'],
+            'days_held': 0,
+            'current_value': entry_price,
+            'unrealized_pnl': 0,
+            'unrealized_pnl_pct': 0,
+            'manual_trade': manual,
+            'status': 'OPEN',
+            # GEX data for analysis
+            'entry_gex': opportunity['net_gex'],
+            'gamma_flip': opportunity['gamma_flip'],
+            'call_wall': opportunity.get('call_wall'),
+            'put_wall': opportunity.get('put_wall'),
+        }
+        
+        st.session_state.open_trades.append(trade)
+        
+        # Show educational popup
+        if manual:
+            st.success(f"✅ **MANUAL TRADE EXECUTED**")
+        else:
+            st.info(f"🤖 **AUTO-TRADE EXECUTED**")
+        
+        st.info(f"""
+        **Trade Details:**
+        - {quantity} contracts of {opportunity['symbol']} {opportunity['trade_type']}
+        - Entry: ${entry_price:.2f} per contract
+        - Total Cost: ${entry_price * quantity * 100:,.2f}
+        - Strategy: {opportunity['structure_type']}
+        """)
+        
+        return True
     
     def update_open_trades(self):
-        """Update all open trades with current values and auto-exit logic"""
+        """Update trades with educational analysis"""
         updated_trades = []
         
         for trade in st.session_state.open_trades:
@@ -100,50 +381,21 @@ class EnhancedMockTradingAccount:
             trade['unrealized_pnl'] = current_total - entry_total
             trade['unrealized_pnl_pct'] = (trade['unrealized_pnl'] / entry_total) * 100
             
-            # Auto-exit logic
-            should_exit = self.check_exit_conditions(trade)
+            # Add educational analysis
+            trade['analysis'] = self.get_educational_trade_analysis(trade)
             
-            if should_exit:
-                # Close the trade
-                exit_reason = should_exit
+            # Check exit conditions
+            exit_reason = self.check_exit_conditions(trade)
+            
+            if exit_reason:
                 self.close_trade(trade, exit_reason)
             else:
                 updated_trades.append(trade)
         
         st.session_state.open_trades = updated_trades
     
-    def check_exit_conditions(self, trade: Dict) -> Optional[str]:
-        """Check if trade should be automatically closed"""
-        pnl_pct = trade.get('unrealized_pnl_pct', 0)
-        days_held = trade.get('days_held', 0)
-        confidence = trade.get('confidence_score', 70)
-        
-        # Profit taking rules
-        if pnl_pct >= 100:  # 100% gain
-            return "Profit Target (100%)"
-        
-        if pnl_pct >= 50 and days_held >= 2:  # 50% gain after 2 days
-            return "Profit Target (50%+)"
-        
-        # Stop loss rules
-        if pnl_pct <= -50:  # 50% loss
-            return "Stop Loss (50%)"
-        
-        # Time-based exits
-        if days_held >= 7:  # Max 7 days
-            return "Time Stop (7 days)"
-        
-        if days_held >= 3 and pnl_pct <= -25:  # Cut losses after 3 days
-            return "Time Stop + Loss"
-        
-        # High confidence trades get more room
-        if confidence >= 90 and pnl_pct <= -30:  # High confidence stop
-            return "High Confidence Stop"
-        
-        return None
-    
     def close_trade(self, trade: Dict, exit_reason: str):
-        """Close a trade and record the result"""
+        """Close trade with educational summary"""
         exit_trade = trade.copy()
         exit_trade['exit_date'] = datetime.now().date()
         exit_trade['exit_price'] = trade['current_value']
@@ -152,144 +404,65 @@ class EnhancedMockTradingAccount:
         exit_trade['realized_pnl_pct'] = trade['unrealized_pnl_pct']
         exit_trade['status'] = 'CLOSED'
         
+        # Add educational summary
+        if exit_trade['realized_pnl'] > 0:
+            exit_trade['lesson_learned'] = f"✅ SUCCESS: The {exit_trade['setup_type']} played out perfectly. Market makers behaved as predicted."
+        else:
+            exit_trade['lesson_learned'] = f"📚 LESSON: The {exit_trade['setup_type']} didn't work. Gamma structure likely changed or external factors interfered."
+        
         st.session_state.closed_trades.append(exit_trade)
         
-        # Log the closure
+        # Educational notification
         if exit_trade['realized_pnl'] > 0:
-            st.success(f"🎉 WINNING TRADE: {exit_trade['symbol']} closed with {exit_trade['realized_pnl_pct']:.1f}% gain! Reason: {exit_reason}")
+            st.success(f"""
+            🎉 **WINNING TRADE CLOSED**
+            {exit_trade['symbol']} {exit_trade['trade_type']}: +{exit_trade['realized_pnl_pct']:.1f}% 
+            Reason: {exit_reason}
+            💡 {exit_trade['lesson_learned']}
+            """)
         else:
-            st.warning(f"❌ Trade closed: {exit_trade['symbol']} with {exit_trade['realized_pnl_pct']:.1f}% loss. Reason: {exit_reason}")
-    
-    def auto_trade_opportunities(self, opportunities: List[Dict]):
-        """Automatically trade high-confidence opportunities"""
-        if not st.session_state.auto_trading_enabled:
-            return
-        
-        balance = self.get_current_balance()
-        available_cash = balance['cash_balance']
-        
-        # Only trade 90%+ confidence opportunities
-        high_conf_opps = [opp for opp in opportunities if opp['confidence_score'] >= 90]
-        
-        for opp in high_conf_opps[:2]:  # Max 2 auto-trades per session
-            # Check if we already have this symbol
-            existing_symbols = [trade['symbol'] for trade in st.session_state.open_trades]
-            if opp['symbol'] in existing_symbols:
-                continue
-            
-            # Position sizing (2% risk per trade)
-            risk_amount = balance['total_value'] * 0.02
-            
-            # Calculate option price
-            if opp['trade_type'] == 'LONG_CALLS':
-                option_price = abs(opp['distance_pct']) * 0.12 + 0.8
-            elif opp['trade_type'] == 'CALL_SELLING':
-                option_price = opp['current_price'] * 0.025
-            else:  # STRADDLE
-                option_price = opp['current_price'] * 0.08
-            
-            quantity = max(1, int(risk_amount / (option_price * 100)))
-            trade_cost = option_price * quantity * 100
-            
-            if trade_cost <= available_cash:
-                self.add_trade(
-                    symbol=opp['symbol'],
-                    trade_type=opp['trade_type'],
-                    entry_price=option_price,
-                    quantity=quantity,
-                    confidence_score=opp['confidence_score'],
-                    setup_type=opp['structure_type'],
-                    recommendation=f"AUTO: {opp['recommendation']}",
-                    auto_trade=True
-                )
-                available_cash -= trade_cost
-    
-    def add_trade(self, symbol: str, trade_type: str, entry_price: float, 
-                  quantity: int, confidence_score: int, setup_type: str, 
-                  recommendation: str, auto_trade: bool = False):
-        """Add a new trade to the portfolio"""
-        
-        # Get current stock price for reference
-        current_stock_price = self.get_real_stock_price(symbol)
-        
-        trade = {
-            'trade_id': str(uuid.uuid4()),
-            'symbol': symbol,
-            'trade_type': trade_type,
-            'entry_date': datetime.now().date(),
-            'entry_timestamp': datetime.now(),
-            'entry_price': entry_price,
-            'entry_stock_price': current_stock_price,
-            'quantity': quantity,
-            'confidence_score': confidence_score,
-            'setup_type': setup_type,
-            'recommendation': recommendation,
-            'days_held': 0,
-            'current_value': entry_price,
-            'unrealized_pnl': 0,
-            'unrealized_pnl_pct': 0,
-            'auto_trade': auto_trade,
-            'status': 'OPEN'
-        }
-        
-        st.session_state.open_trades.append(trade)
-        
-        if auto_trade:
-            st.info(f"🤖 **AUTO-TRADE EXECUTED:** {quantity} contracts of {symbol} {trade_type}")
-        else:
-            st.success(f"✅ **TRADE EXECUTED:** {quantity} contracts of {symbol} {trade_type}")
-        
-        return True
+            st.warning(f"""
+            📚 **LEARNING TRADE CLOSED**
+            {exit_trade['symbol']} {exit_trade['trade_type']}: {exit_trade['realized_pnl_pct']:.1f}%
+            Reason: {exit_reason}
+            💡 {exit_trade['lesson_learned']}
+            """)
     
     def get_current_balance(self) -> Dict:
-        """Calculate current portfolio balance"""
-        self.update_open_trades()  # Update all trades first
+        """Calculate current balance with detailed breakdown"""
+        self.update_open_trades()
         
-        # Calculate values
         cash_balance = self.initial_balance
         positions_value = 0
         unrealized_pnl = 0
         realized_pnl = 0
         
-        # Subtract invested amounts and add current position values
+        # Calculate open positions
         for trade in st.session_state.open_trades:
             invested = trade['entry_price'] * trade['quantity'] * 100
             current_val = trade['current_value'] * trade['quantity'] * 100
             
-            cash_balance -= invested  # Remove initial investment
-            positions_value += current_val  # Add current value
+            cash_balance -= invested
+            positions_value += current_val
             unrealized_pnl += trade['unrealized_pnl']
         
-        # Add realized P&L from closed trades
+        # Add realized P&L
         for trade in st.session_state.closed_trades:
             realized_pnl += trade['realized_pnl']
         
         total_value = cash_balance + positions_value + realized_pnl
         total_return_pct = ((total_value - self.initial_balance) / self.initial_balance) * 100
         
-        # Calculate win rate
+        # Win rate and other stats
         if st.session_state.closed_trades:
             winning_trades = len([t for t in st.session_state.closed_trades if t['realized_pnl'] > 0])
             win_rate = (winning_trades / len(st.session_state.closed_trades)) * 100
+            avg_winner = np.mean([t['realized_pnl_pct'] for t in st.session_state.closed_trades if t['realized_pnl'] > 0]) if winning_trades > 0 else 0
+            avg_loser = np.mean([t['realized_pnl_pct'] for t in st.session_state.closed_trades if t['realized_pnl'] <= 0]) if len(st.session_state.closed_trades) - winning_trades > 0 else 0
         else:
             win_rate = 0
-        
-        # Update portfolio history for charting
-        portfolio_snapshot = {
-            'timestamp': datetime.now(),
-            'total_value': total_value,
-            'total_return_pct': total_return_pct,
-            'positions_value': positions_value,
-            'cash_balance': cash_balance,
-            'realized_pnl': realized_pnl,
-            'unrealized_pnl': unrealized_pnl
-        }
-        
-        st.session_state.portfolio_history.append(portfolio_snapshot)
-        
-        # Keep only last 100 snapshots
-        if len(st.session_state.portfolio_history) > 100:
-            st.session_state.portfolio_history = st.session_state.portfolio_history[-100:]
+            avg_winner = 0
+            avg_loser = 0
         
         return {
             'total_value': total_value,
@@ -300,201 +473,354 @@ class EnhancedMockTradingAccount:
             'total_return_pct': total_return_pct,
             'open_trades_count': len(st.session_state.open_trades),
             'closed_trades_count': len(st.session_state.closed_trades),
-            'win_rate': win_rate
+            'win_rate': win_rate,
+            'avg_winner': avg_winner,
+            'avg_loser': avg_loser
         }
-    
-    def get_portfolio_performance_chart(self):
-        """Generate portfolio performance chart"""
-        if len(st.session_state.portfolio_history) < 2:
-            return None
-        
-        df = pd.DataFrame(st.session_state.portfolio_history)
-        
-        fig = go.Figure()
-        
-        # Add portfolio value line
-        fig.add_trace(go.Scatter(
-            x=df['timestamp'],
-            y=df['total_value'],
-            mode='lines+markers',
-            name='Portfolio Value',
-            line=dict(color='#00ff87', width=3),
-            marker=dict(size=6)
-        ))
-        
-        # Add starting value line
-        fig.add_hline(
-            y=self.initial_balance,
-            line_dash="dash",
-            line_color="white",
-            annotation_text=f"Starting Value: ${self.initial_balance:,}",
-            annotation_position="top left"
-        )
-        
-        # Styling
-        fig.update_layout(
-            title={
-                'text': 'Portfolio Performance Over Time',
-                'x': 0.5,
-                'font': {'size': 20, 'color': 'white'}
-            },
-            xaxis_title="Time",
-            yaxis_title="Portfolio Value ($)",
-            template="plotly_dark",
-            height=400,
-            showlegend=True,
-            xaxis=dict(color='white'),
-            yaxis=dict(color='white', tickformat='$,.0f'),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        
-        return fig
-    
-    def get_trade_performance_summary(self) -> pd.DataFrame:
-        """Get summary of trade performance"""
-        if not st.session_state.closed_trades:
-            return pd.DataFrame()
-        
-        df = pd.DataFrame(st.session_state.closed_trades)
-        
-        summary = df.groupby(['trade_type', 'setup_type']).agg({
-            'realized_pnl': ['count', 'mean', 'sum'],
-            'realized_pnl_pct': ['mean', lambda x: (x > 0).mean() * 100],  # win rate
-            'days_held': 'mean'
-        }).round(2)
-        
-        summary.columns = ['Trades', 'Avg P&L ($)', 'Total P&L ($)', 'Avg Return (%)', 'Win Rate (%)', 'Avg Days']
-        
-        return summary.reset_index()
 
-def display_enhanced_mock_portfolio():
-    """Display the enhanced mock portfolio with auto-trading"""
-    st.header("💰 Enhanced Mock Trading Account - $100K Challenge")
+def display_morning_analysis():
+    """Enhanced morning analysis with clear timing and explanations"""
+    st.header("🌅 Morning Gamma Analysis - Live Trading Opportunities")
     
-    # Initialize enhanced account
+    # Analysis timing info
+    current_time = datetime.now()
+    last_update = st.session_state.get('last_analysis_time', current_time - timedelta(minutes=30))
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.info(f"**Last Analysis:** {last_update.strftime('%I:%M %p ET')}")
+    with col2:
+        st.info(f"**Current Time:** {current_time.strftime('%I:%M %p ET')}")
+    with col3:
+        st.info(f"**Next Update:** {(current_time + timedelta(minutes=15)).strftime('%I:%M %p ET')}")
+    
+    st.markdown("""
+    ### 📊 How Our Analysis Works
+    
+    **Every Morning at 9:15 AM ET, we:**
+    1. 🔍 Scan 100+ stocks for gamma exposure patterns
+    2. 🧮 Calculate exact gamma flip points and wall levels  
+    3. 🎯 Identify the 3-5 highest probability setups
+    4. 📈 Rank by confidence score (65%+ makes the list)
+    5. 🚨 Alert on 90%+ confidence opportunities for auto-trading
+    
+    **Why 9:15 AM?** Options market makers adjust their hedging positions based on overnight news and pre-market moves. By 9:15, the gamma structure is clear and opportunities are identified.
+    """)
+    
+    # Get opportunities
+    account = EnhancedMockTradingAccount()
+    opportunities = account.get_realistic_opportunities()
+    
+    # Display opportunities with full educational context
+    st.subheader("🎯 Today's Top Opportunities")
+    
+    for i, opp in enumerate(opportunities):
+        confidence_color = "🟢" if opp['confidence_score'] >= 85 else "🟡" if opp['confidence_score'] >= 75 else "🟠"
+        
+        with st.expander(f"{confidence_color} {opp['symbol']} - {opp['confidence_score']}% Confidence - {opp['structure_type']}"):
+            
+            # Key metrics
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.markdown(f"""
+                **🎯 Strategy:** {opp['recommendation']}
+                
+                **📈 Current Setup:**
+                - Price: ${opp['current_price']:.2f}
+                - Gamma Flip: ${opp['gamma_flip']:.2f} ({opp['distance_pct']:+.1f}%)
+                - Net GEX: {opp['net_gex']/1000000:.0f}M
+                """)
+                
+                if 'call_wall' in opp:
+                    st.markdown(f"- Call Wall: ${opp['call_wall']:.2f}")
+                if 'put_wall' in opp:
+                    st.markdown(f"- Put Wall: ${opp['put_wall']:.2f}")
+            
+            with col2:
+                # Visual setup diagram
+                fig = go.Figure()
+                
+                current = opp['current_price']
+                flip = opp['gamma_flip']
+                
+                # Add price levels
+                fig.add_hline(y=current, line_dash="solid", line_color="yellow", 
+                             annotation_text=f"Current: ${current:.2f}")
+                fig.add_hline(y=flip, line_dash="dash", line_color="orange",
+                             annotation_text=f"Gamma Flip: ${flip:.2f}")
+                
+                if 'call_wall' in opp:
+                    fig.add_hline(y=opp['call_wall'], line_dash="dot", line_color="red",
+                                 annotation_text=f"Call Wall: ${opp['call_wall']:.2f}")
+                
+                if 'put_wall' in opp:
+                    fig.add_hline(y=opp['put_wall'], line_dash="dot", line_color="green",
+                                 annotation_text=f"Put Wall: ${opp['put_wall']:.2f}")
+                
+                fig.update_layout(
+                    title=f"{opp['symbol']} Levels",
+                    height=300,
+                    yaxis_title="Price ($)",
+                    showlegend=False,
+                    template="plotly_dark"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Educational explanation
+            st.markdown(f"""
+            ### 💡 Why This Works:
+            {opp['explanation']}
+            
+            ### ✅ Entry Logic:
+            {opp['entry_logic']}
+            
+            ### 🎯 Profit Target:
+            {opp['profit_target']}
+            
+            ### ⚠️ Risk Warning:
+            {opp['risk_warning']}
+            """)
+            
+            # Trading buttons
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"📈 Execute Trade", key=f"trade_{i}"):
+                    account.add_trade(opp, manual=True)
+            
+            with col2:
+                st.info(f"Estimated Premium: ${opp['expected_premium']:.2f}")
+
+def display_enhanced_portfolio():
+    """Enhanced portfolio with educational features"""
+    st.header("💰 $100K Gamma Trading Challenge - Learn While You Earn")
+    
     account = EnhancedMockTradingAccount()
     
-    # Auto-trading controls
-    st.subheader("🤖 Auto-Trading Settings")
-    col1, col2 = st.columns(2)
+    # Educational intro
+    st.markdown("""
+    ### 🎓 Welcome to Your Educational Trading Account
     
+    This is your **$100,000 virtual trading account** where you can practice gamma exposure strategies without risk.
+    Every trade comes with detailed explanations of why it works (or doesn't work).
+    
+    **Key Features:**
+    - 🎯 Start with $100K virtual money
+    - 📚 Learn from every win AND loss
+    - 🤖 Auto-trading for 90%+ confidence setups
+    - 📊 Track performance vs. gamma predictions
+    """)
+    
+    # Auto-trading toggle with explanation
+    st.subheader("🤖 Auto-Trading Education")
+    
+    col1, col2 = st.columns([1, 2])
     with col1:
         auto_trading = st.checkbox(
-            "Enable Auto-Trading", 
+            "Enable Auto-Trading",
             value=st.session_state.auto_trading_enabled,
-            help="Automatically trade 90%+ confidence opportunities"
+            help="Automatically execute trades with 90%+ confidence"
         )
         st.session_state.auto_trading_enabled = auto_trading
     
     with col2:
-        if st.button("🔄 Update All Trades"):
-            account.update_open_trades()
-            st.success("All trades updated with current market data!")
+        if auto_trading:
+            st.info("🤖 **Auto-trading ON**: Will execute 90%+ confidence trades automatically")
+        else:
+            st.warning("👤 **Manual mode**: You choose which trades to execute")
     
-    # Get current balance
+    # Portfolio metrics
     balance = account.get_current_balance()
     
-    # Display portfolio metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        color = "normal" if balance['total_return_pct'] >= 0 else "inverse"
         st.metric(
-            "Total Portfolio Value",
-            f"${balance['total_value']:,.2f}",
-            f"{balance['total_return_pct']:+.2f}%"
+            "Portfolio Value",
+            f"${balance['total_value']:,.0f}",
+            f"{balance['total_return_pct']:+.1f}%",
+            delta_color=color
         )
     
     with col2:
-        st.metric("Cash Balance", f"${balance['cash_balance']:,.2f}")
+        st.metric("Cash Available", f"${balance['cash_balance']:,.0f}")
     
     with col3:
-        st.metric("Positions Value", f"${balance['positions_value']:,.2f}")
+        st.metric("Win Rate", f"{balance['win_rate']:.0f}%", 
+                 f"{balance['closed_trades_count']} completed")
     
     with col4:
-        st.metric(
-            "Win Rate",
-            f"{balance['win_rate']:.1f}%",
-            f"{balance['closed_trades_count']} closed trades"
-        )
+        if balance['avg_winner'] > 0:
+            st.metric("Avg Winner", f"+{balance['avg_winner']:.1f}%",
+                     f"Avg Loser: {balance['avg_loser']:.1f}%")
+        else:
+            st.metric("Open Trades", f"{balance['open_trades_count']}")
     
-    # Portfolio performance chart
-    fig = account.get_portfolio_performance_chart()
-    if fig:
-        st.subheader("📈 Portfolio Performance Chart")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Display P&L breakdown
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Realized P&L", f"${balance['realized_pnl']:,.2f}")
-    with col2:
-        st.metric("Unrealized P&L", f"${balance['unrealized_pnl']:,.2f}")
-    
-    # Sample opportunities for demo
-    sample_opportunities = [
-        {
-            'symbol': 'MARA', 'current_price': 25.50, 'gamma_flip': 23.20,
-            'distance_pct': 9.02, 'structure_type': 'CALL_SELLING_SETUP',
-            'confidence_score': 95, 'recommendation': 'SELL CALLS - above flip',
-            'trade_type': 'CALL_SELLING'
-        },
-        {
-            'symbol': 'GME', 'current_price': 22.15, 'gamma_flip': 24.80,
-            'distance_pct': -11.97, 'structure_type': 'SQUEEZE_SETUP',
-            'confidence_score': 92, 'recommendation': 'BUY CALLS - squeeze',
-            'trade_type': 'LONG_CALLS'
-        }
-    ]
-    
-    # Auto-trade opportunities if enabled
-    if st.session_state.auto_trading_enabled:
-        account.auto_trade_opportunities(sample_opportunities)
-    
-    # Manual trading interface
-    st.subheader("📈 Manual Trading")
-    for i, opp in enumerate(sample_opportunities):
-        with st.expander(f"🎯 {opp['symbol']} - {opp['confidence_score']}%"):
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                st.write(f"**Strategy:** {opp['recommendation']}")
-                st.write(f"**Price:** ${opp['current_price']:.2f} | **Flip:** ${opp['gamma_flip']:.2f}")
-            
-            with col2:
-                if st.button(f"Manual Trade", key=f"manual_{i}"):
-                    account.add_trade(
-                        symbol=opp['symbol'],
-                        trade_type=opp['trade_type'],
-                        entry_price=2.50,
-                        quantity=5,
-                        confidence_score=opp['confidence_score'],
-                        setup_type=opp['structure_type'],
-                        recommendation=opp['recommendation']
-                    )
-    
-    # Show open positions
+    # Current positions with educational analysis
     if st.session_state.open_trades:
-        st.subheader("📊 Open Positions")
-        trades_df = pd.DataFrame(st.session_state.open_trades)
-        trades_df = trades_df[['symbol', 'trade_type', 'entry_date', 'entry_price', 
-                              'current_value', 'quantity', 'days_held', 'unrealized_pnl_pct', 'confidence_score']]
-        st.dataframe(trades_df, use_container_width=True)
-    
-    # Show closed trades
-    if st.session_state.closed_trades:
-        st.subheader("📈 Closed Trades")
-        closed_df = pd.DataFrame(st.session_state.closed_trades)
-        closed_df = closed_df[['symbol', 'trade_type', 'exit_date', 'realized_pnl', 
-                              'realized_pnl_pct', 'days_held', 'exit_reason']]
-        st.dataframe(closed_df, use_container_width=True)
+        st.subheader("📊 Your Active Positions")
         
-        # Performance summary
-        summary = account.get_trade_performance_summary()
-        if not summary.empty:
-            st.subheader("📊 Performance Summary")
-            st.dataframe(summary, use_container_width=True)
+        for trade in st.session_state.open_trades:
+            pnl_color = "🟢" if trade['unrealized_pnl_pct'] > 0 else "🔴" if trade['unrealized_pnl_pct'] < -10 else "🟡"
+            
+            with st.expander(f"{pnl_color} {trade['symbol']} {trade['trade_type']} - {trade['unrealized_pnl_pct']:+.1f}%"):
+                
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    st.markdown(f"""
+                    **Original Strategy:** {trade['setup_type']}
+                    **Entry Logic:** {trade['entry_logic']}
+                    **Days Held:** {trade['days_held']}
+                    **Position Size:** {trade['quantity']} contracts
+                    
+                    {trade.get('analysis', '')}
+                    """)
+                
+                with col2:
+                    st.metric("Current P&L", 
+                             f"${trade['unrealized_pnl']:,.0f}",
+                             f"{trade['unrealized_pnl_pct']:+.1f}%")
+                    
+                    if st.button(f"Close Position", key=f"close_{trade['trade_id']}"):
+                        account.close_trade(trade, "Manual Close")
+                        st.rerun()
+    
+    # Completed trades with lessons learned
+    if st.session_state.closed_trades:
+        st.subheader("📈 Completed Trades - Learning History")
+        
+        recent_trades = st.session_state.closed_trades[-5:]  # Show last 5
+        
+        for trade in reversed(recent_trades):
+            result_color = "🎉" if trade['realized_pnl'] > 0 else "📚"
+            
+            with st.expander(f"{result_color} {trade['symbol']} - {trade['realized_pnl_pct']:+.1f}% - {trade['exit_reason']}"):
+                st.markdown(f"""
+                **Strategy Used:** {trade['setup_type']}
+                **Held for:** {trade['days_held']} days
+                **Final P&L:** ${trade['realized_pnl']:,.0f} ({trade['realized_pnl_pct']:+.1f}%)
+                
+                **💡 Lesson Learned:**
+                {trade.get('lesson_learned', 'Trade completed successfully.')}
+                """)
+    
+    # Performance analytics
+    if balance['closed_trades_count'] > 0:
+        st.subheader("📊 Performance Analytics")
+        
+        # Create performance breakdown by strategy type
+        df = pd.DataFrame(st.session_state.closed_trades)
+        
+        if not df.empty:
+            strategy_performance = df.groupby('setup_type').agg({
+                'realized_pnl_pct': ['count', 'mean', lambda x: (x > 0).mean() * 100],
+                'days_held': 'mean'
+            }).round(2)
+            
+            strategy_performance.columns = ['Count', 'Avg Return %', 'Win Rate %', 'Avg Days']
+            
+            st.dataframe(strategy_performance, use_container_width=True)
 
-# Example usage
+def main():
+    """Main application with enhanced navigation and education"""
+    
+    st.title("🚀 Gamma Exposure Trading System")
+    st.markdown("**Learn Professional Options Trading Through Market Maker Psychology**")
+    
+    # Enhanced sidebar navigation
+    st.sidebar.title("🎯 Navigation")
+    
+    page = st.sidebar.selectbox("Choose Section:", [
+        "🎓 Learn the Strategy",
+        "🌅 Morning Analysis", 
+        "💰 Trading Challenge",
+        "📊 Portfolio Performance"
+    ])
+    
+    # Educational sidebar content
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+    ### 📚 Quick Reference
+    
+    **🚀 Squeeze Plays:**
+    - Below gamma flip
+    - Negative GEX
+    - Target: 50-100%
+    
+    **🛡️ Premium Selling:**
+    - Above gamma flip  
+    - Positive GEX
+    - Target: 25-50%
+    
+    **⚖️ Iron Condors:**
+    - High positive GEX
+    - Wide walls
+    - Target: 20-40%
+    """)
+    
+    # Page routing with educational enhancements
+    if page == "🎓 Learn the Strategy":
+        st.header("🎓 Master Gamma Exposure Trading")
+        
+        # Educational tabs
+        tab1, tab2, tab3 = st.tabs(["📖 How It Works", "💡 Strategies", "✅ Entry Rules"])
+        
+        with tab1:
+            GEXEducationalSystem.explain_market_makers()
+            
+            # Interactive demo
+            st.subheader("🎯 Interactive Demo: Gamma in Action")
+            
+            demo_price = st.slider("Stock Price", 95, 105, 100)
+            gamma_flip = 98
+            
+            if demo_price < gamma_flip:
+                st.error(f"📉 Below Flip: Market makers will AMPLIFY moves up! Perfect for buying calls.")
+            else:
+                st.success(f"📈 Above Flip: Market makers will DAMPEN moves down! Perfect for selling options.")
+        
+        with tab2:
+            GEXEducationalSystem.show_strategy_overview()
+        
+        with tab3:
+            GEXEducationalSystem.show_entry_criteria()
+    
+    elif page == "🌅 Morning Analysis":
+        display_morning_analysis()
+    
+    elif page == "💰 Trading Challenge":
+        display_enhanced_portfolio()
+    
+    elif page == "📊 Portfolio Performance":
+        st.header("📊 Advanced Performance Analytics")
+        
+        account = EnhancedMockTradingAccount()
+        balance = account.get_current_balance()
+        
+        if balance['closed_trades_count'] == 0:
+            st.info("📈 Start trading to see performance analytics here!")
+            return
+        
+        # Detailed analytics would go here
+        st.metric("Total Return", f"{balance['total_return_pct']:+.1f}%")
+        
+        # Performance by strategy
+        if st.session_state.closed_trades:
+            df = pd.DataFrame(st.session_state.closed_trades)
+            
+            fig = px.bar(
+                df.groupby('setup_type')['realized_pnl_pct'].mean().reset_index(),
+                x='setup_type', 
+                y='realized_pnl_pct',
+                title="Average Return by Strategy Type",
+                color='realized_pnl_pct',
+                color_continuous_scale="RdYlGn"
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+
 if __name__ == "__main__":
-    display_enhanced_mock_portfolio()
+    main()
