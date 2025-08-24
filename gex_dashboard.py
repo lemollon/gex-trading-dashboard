@@ -1622,130 +1622,352 @@ def main():
         )
         
         if strategy_option == "Quick Start Guide":
-            st.markdown("""
-            <div class='info-box'>
-                <h3>🚀 Quick Start Guide</h3>
-                
-                <h4>1. Set Up Your Watchlist</h4>
-                <ul>
-                    <li>Add symbols you want to monitor in the sidebar</li>
-                    <li>Include major indices (SPY, QQQ) and your favorite stocks</li>
-                    <li>The system will scan all symbols simultaneously</li>
-                </ul>
-                
-                <h4>2. Configure Risk Settings</h4>
-                <ul>
-                    <li>Set maximum position size (recommended: 3-5%)</li>
-                    <li>Define minimum confidence threshold (recommended: 65-75%)</li>
-                    <li>Adjust based on your risk tolerance</li>
-                </ul>
-                
-                <h4>3. Monitor Top Opportunities</h4>
-                <ul>
-                    <li>Check the "Top Opportunities" tab for best setups</li>
-                    <li>Setups are ranked by confidence across ALL symbols</li>
-                    <li>Green badges = high confidence (>80%)</li>
-                </ul>
-                
-                <h4>4. Execute Trades</h4>
-                <ul>
-                    <li>Review setup details carefully</li>
-                    <li>Check entry criteria and position sizing</li>
-                    <li>Click "Execute Trade" to add to portfolio</li>
-                </ul>
-                
-                <h4>5. Manage Positions</h4>
-                <ul>
-                    <li>Monitor active positions in the Positions tab</li>
-                    <li>Set alerts for important levels</li>
-                    <li>Follow exit criteria for each strategy</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("### 🚀 Quick Start Guide")
+            
+            st.markdown("#### 1. Set Up Your Watchlist")
+            st.info("""
+            • Add symbols you want to monitor in the sidebar
+            • Include major indices (SPY, QQQ) and your favorite stocks  
+            • The system will scan all symbols simultaneously
+            """)
+            
+            st.markdown("#### 2. Configure Risk Settings")
+            st.info("""
+            • Set maximum position size (recommended: 3-5%)
+            • Define minimum confidence threshold (recommended: 65-75%)
+            • Adjust based on your risk tolerance
+            """)
+            
+            st.markdown("#### 3. Monitor Top Opportunities")
+            st.success("""
+            • Check the "Top Opportunities" tab for best setups
+            • Setups are ranked by confidence across ALL symbols
+            • Green badges = high confidence (>80%)
+            """)
+            
+            st.markdown("#### 4. Execute Trades")
+            st.info("""
+            • Review setup details carefully
+            • Check entry criteria and position sizing
+            • Click "Execute Trade" to add to portfolio
+            """)
+            
+            st.markdown("#### 5. Manage Positions")
+            st.info("""
+            • Monitor active positions in the Positions tab
+            • Set alerts for important levels
+            • Follow exit criteria for each strategy
+            """)
         
         elif strategy_option == "Squeeze Plays":
-            st.markdown("""
-            <div class='info-box'>
-                <h3>🚀 Squeeze Play Strategies</h3>
+            st.markdown("### 🚀 Squeeze Play Strategies")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Negative GEX Squeeze (Long Calls)")
                 
-                <h4>Negative GEX Squeeze (Long Calls)</h4>
-                <strong>Setup Conditions:</strong>
-                <ul>
-                    <li>Net GEX < -1B (SPY) or < -500M (QQQ) or < -100M (stocks)</li>
-                    <li>Price 0.5-1.5% below gamma flip point</li>
-                    <li>Strong put wall support within 1% below</li>
-                </ul>
+                st.markdown("**Setup Conditions:**")
+                st.warning("""
+                • Net GEX < -1B (SPY) or < -500M (QQQ) or < -100M (stocks)
+                • Price 0.5-1.5% below gamma flip point
+                • Strong put wall support within 1% below
+                """)
                 
-                <strong>Entry:</strong>
-                <ul>
-                    <li>Buy ATM or first OTM call above flip</li>
-                    <li>Use 2-5 DTE options for maximum gamma</li>
-                    <li>Size for potential 100% loss (3% max)</li>
-                </ul>
+                st.markdown("**Entry:**")
+                st.info("""
+                • Buy ATM or first OTM call above flip
+                • Use 2-5 DTE options for maximum gamma
+                • Size for potential 100% loss (3% max)
+                """)
                 
-                <strong>Exit:</strong>
-                <ul>
-                    <li>Target: Gamma flip point or above</li>
-                    <li>Stop: Break below put wall support</li>
-                    <li>Time stop: Close if <1 DTE remains</li>
-                </ul>
+                st.markdown("**Exit:**")
+                st.success("""
+                • Target: Gamma flip point or above
+                • Stop: Break below put wall support
+                • Time stop: Close if <1 DTE remains
+                """)
+            
+            with col2:
+                st.markdown("#### Positive GEX Breakdown (Long Puts)")
                 
-                <h4>Positive GEX Breakdown (Long Puts)</h4>
-                <strong>Setup Conditions:</strong>
-                <ul>
-                    <li>Net GEX > 2B (SPY) or > 1B (QQQ) or > 200M (stocks)</li>
-                    <li>Price hovering near flip (within 0.3%)</li>
-                    <li>Recent rejection from call wall</li>
-                </ul>
+                st.markdown("**Setup Conditions:**")
+                st.warning("""
+                • Net GEX > 2B (SPY) or > 1B (QQQ) or > 200M (stocks)
+                • Price hovering near flip (within 0.3%)
+                • Recent rejection from call wall
+                """)
                 
-                <strong>Entry:</strong>
-                <ul>
-                    <li>Buy ATM or first OTM put below flip</li>
-                    <li>Use 3-7 DTE options</li>
-                    <li>Size for 3% max portfolio risk</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+                st.markdown("**Entry:**")
+                st.info("""
+                • Buy ATM or first OTM put below flip
+                • Use 3-7 DTE options
+                • Size for 3% max portfolio risk
+                """)
+                
+                st.markdown("**Exit:**")
+                st.success("""
+                • Target: First strike below flip
+                • Stop: Break above call wall
+                • Time stop: Close if <1 DTE remains
+                """)
+        
+        elif strategy_option == "Premium Selling":
+            st.markdown("### 💰 Premium Selling Strategies")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Call Selling at Resistance")
+                
+                st.warning("""
+                **Setup Requirements:**
+                • Net GEX > 3B with strong call wall
+                • Wall strength > 500M gamma
+                • Price 0.5-2% below wall
+                """)
+                
+                st.info("""
+                **Entry & Management:**
+                • Sell calls at or above wall strike
+                • Use 0-2 DTE for rapid decay
+                • Size for 5% max capital risk
+                • Close at 50% profit or approaching wall
+                """)
+            
+            with col2:
+                st.markdown("#### Put Selling at Support")
+                
+                st.warning("""
+                **Setup Requirements:**
+                • Strong put wall > 500M gamma
+                • Price at least 1% above wall
+                • Positive net GEX environment
+                """)
+                
+                st.info("""
+                **Entry & Management:**
+                • Sell puts at or below wall strike
+                • Use 2-5 DTE options
+                • Size for 5% max capital risk
+                • Close at 50% profit or define max loss
+                """)
+        
+        elif strategy_option == "Iron Condors":
+            st.markdown("### 🦅 Iron Condor Strategies")
+            
+            st.markdown("#### Standard Iron Condor")
+            st.info("""
+            **Setup Requirements:**
+            • Net GEX > 1B (positive gamma environment)
+            • Call and put walls > 3% apart
+            • Low IV rank (<50th percentile)
+            
+            **Construction:**
+            • Short strikes at gamma walls
+            • Long strikes beyond major gamma concentrations
+            • Use 5-10 DTE for optimal theta/gamma ratio
+            • Size for 2% max portfolio loss
+            """)
+            
+            st.markdown("#### Broken Wing Adjustments")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.success("""
+                **Bullish Bias (Put gamma > Call gamma):**
+                • Wider put spread (1.5x)
+                • Narrower call spread (0.75x)
+                • Collect more premium on put side
+                """)
+            
+            with col2:
+                st.warning("""
+                **Bearish Bias (Call gamma > Put gamma):**
+                • Wider call spread (1.5x)
+                • Narrower put spread (0.75x)
+                • Collect more premium on call side
+                """)
+        
+        elif strategy_option == "Risk Management":
+            st.markdown("### ⚖️ Risk Management Rules")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Position Sizing")
+                st.error("""
+                **Maximum Allocations:**
+                • Squeeze Plays: 3% of capital
+                • Premium Selling: 5% of capital
+                • Iron Condors: Size for 2% max loss
+                • Total Directional: 15% exposure
+                • Portfolio Maximum: 50% invested
+                """)
+                
+                st.markdown("#### Stop Losses")
+                st.warning("""
+                **Exit Rules:**
+                • Long Options: 50% loss or wall breach
+                • Short Options: 100% loss or defined risk
+                • Iron Condors: Threatened strike
+                • Time Stop: Close if <1 DTE
+                """)
+            
+            with col2:
+                st.markdown("#### Portfolio Limits")
+                st.info("""
+                **Risk Controls:**
+                • Maximum 5-7 concurrent positions
+                • Daily loss limit: 5% of portfolio
+                • Correlation limit: Max 3 similar setups
+                • Reduce size in high volatility
+                """)
+                
+                st.markdown("#### Adjustment Rules")
+                st.success("""
+                **When to Adjust:**
+                • Roll if breached with >3 DTE
+                • Add hedges on regime change
+                • Reduce on 2% daily loss
+                • Close all if flip breached
+                """)
         
         elif strategy_option == "GEX Fundamentals":
-            st.markdown("""
-            <div class='info-box'>
-                <h3>📚 Understanding Gamma Exposure (GEX)</h3>
+            st.markdown("### 📚 Understanding Gamma Exposure (GEX)")
+            
+            st.markdown("#### What is GEX?")
+            st.info("""
+            GEX measures the aggregate gamma exposure of options dealers/market makers. 
+            It indicates how much dealers need to hedge as the underlying price moves.
+            
+            **The Formula:** GEX = Spot Price × Gamma × Open Interest × 100
+            """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("#### Positive GEX Environment")
+                st.success("""
+                **Characteristics:**
+                • Dealers are long gamma
+                • They sell rallies and buy dips
+                • Volatility suppression
+                • Mean reversion likely
+                • Range-bound trading
                 
-                <h4>What is GEX?</h4>
-                <p>GEX measures the aggregate gamma exposure of options dealers/market makers. 
-                It indicates how much dealers need to hedge as the underlying price moves.</p>
+                **Best Strategies:**
+                • Premium selling
+                • Iron condors
+                • Mean reversion trades
+                """)
+            
+            with col2:
+                st.markdown("#### Negative GEX Environment")
+                st.error("""
+                **Characteristics:**
+                • Dealers are short gamma
+                • They buy rallies and sell dips
+                • Volatility amplification
+                • Trending moves likely
+                • Explosive price action
                 
-                <h4>The Calculation</h4>
-                <p><strong>GEX = Spot Price × Gamma × Open Interest × 100</strong></p>
-                <ul>
-                    <li>Calls contribute positive GEX</li>
-                    <li>Puts contribute negative GEX</li>
-                    <li>Net GEX = Sum of all individual GEX values</li>
-                </ul>
-                
-                <h4>Why It Matters</h4>
-                <ul>
-                    <li><strong>Positive GEX:</strong> Dealers are long gamma → sell rallies, buy dips → volatility suppression</li>
-                    <li><strong>Negative GEX:</strong> Dealers are short gamma → buy rallies, sell dips → volatility amplification</li>
-                </ul>
-                
-                <h4>Key Levels</h4>
-                <ul>
-                    <li><strong>Gamma Flip:</strong> Where net GEX crosses zero (regime change)</li>
-                    <li><strong>Call Walls:</strong> Resistance levels with high positive gamma</li>
-                    <li><strong>Put Walls:</strong> Support levels with high negative gamma</li>
-                </ul>
-                
-                <h4>Reading the Dashboard</h4>
-                <ul>
-                    <li>🟢 Green bars = Call gamma (resistance)</li>
-                    <li>🔴 Red bars = Put gamma (support)</li>
-                    <li>🔵 Blue line = Current spot price</li>
-                    <li>🟡 Yellow line = Gamma flip point</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+                **Best Strategies:**
+                • Squeeze plays
+                • Momentum trades
+                • Directional options
+                """)
+            
+            st.markdown("#### Key Levels to Watch")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.warning("""
+                **Gamma Flip Point**
+                • Where net GEX = 0
+                • Regime change level
+                • Critical S/R level
+                • Volatility shifts here
+                """)
+            
+            with col2:
+                st.success("""
+                **Call Walls**
+                • Resistance levels
+                • High positive gamma
+                • Dealers sell here
+                • Price often reverses
+                """)
+            
+            with col3:
+                st.error("""
+                **Put Walls**
+                • Support levels
+                • High negative gamma
+                • Dealers buy here
+                • Bounces likely
+                """)
+        
+        elif strategy_option == "Market Regimes":
+            st.markdown("### 🎭 Market Regime Playbook")
+            
+            # Create a visual regime guide
+            regimes = {
+                "🔴 High Negative GEX (<-1B)": {
+                    "characteristics": "Maximum volatility, explosive moves, dealers chase price",
+                    "strategies": "Long volatility, squeeze plays, momentum trades",
+                    "avoid": "Premium selling without protection",
+                    "color": "error"
+                },
+                "🟠 Moderate Negative (-1B to 0)": {
+                    "characteristics": "Elevated volatility, trending likely, some amplification",
+                    "strategies": "Directional plays with stops, moderate squeezes",
+                    "avoid": "Iron condors, naked short options",
+                    "color": "warning"
+                },
+                "🟡 Low Positive (0 to 1B)": {
+                    "characteristics": "Balanced market, mild suppression, selective opportunities",
+                    "strategies": "Selective premium selling, tight condors",
+                    "avoid": "Large squeeze plays",
+                    "color": "info"
+                },
+                "🟢 High Positive (>1B)": {
+                    "characteristics": "Volatility suppression, range-bound, mean reversion",
+                    "strategies": "Premium selling, iron condors, fade extremes",
+                    "avoid": "Breakout trades, long volatility",
+                    "color": "success"
+                }
+            }
+            
+            for regime, details in regimes.items():
+                with st.expander(regime, expanded=True):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown("**Characteristics:**")
+                        st.write(details["characteristics"])
+                    
+                    with col2:
+                        st.markdown("**Best Strategies:**")
+                        st.write(details["strategies"])
+                    
+                    with col3:
+                        st.markdown("**Avoid:**")
+                        st.write(details["avoid"])
+            
+            st.markdown("#### Quick Reference Table")
+            
+            regime_df = pd.DataFrame({
+                "Net GEX": ["< -1B", "-1B to 0", "0 to 1B", "> 1B"],
+                "Regime": ["High Negative", "Moderate Negative", "Low Positive", "High Positive"],
+                "Volatility": ["Maximum", "Elevated", "Normal", "Suppressed"],
+                "Best Play": ["Squeeze Long", "Directional", "Selective", "Premium Sell"],
+                "Risk Level": ["🔴 High", "🟠 Medium-High", "🟡 Medium", "🟢 Low"]
+            })
+            
+            st.dataframe(regime_df, use_container_width=True, hide_index=True)
     
     # Footer with gradient and animation
     st.divider()
