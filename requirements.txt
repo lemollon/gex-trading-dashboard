@@ -1,9 +1,8 @@
-streamlit==1.28.1
-pandas==2.1.1
-numpy==1.24.3
-plotly==5.17.0
-requests==2.31.0
-yfinance==0.2.18
-databricks-sql-connector==2.9.3
-python-dateutil==2.8.2
-pytz==2023.3
+streamlit>=1.28.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.15.0
+requests>=2.30.0
+yfinance>=0.2.0
+python-dateutil>=2.8.0
+pytz>=2023.0
