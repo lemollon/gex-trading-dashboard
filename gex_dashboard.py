@@ -1,4 +1,4 @@
-# 🚀 Visually Stunning Gamma Exposure Trading System with REAL DATA
+# 🚀 Complete Gamma Exposure Trading System with Real Market Data
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -76,21 +76,6 @@ st.markdown("""
         border-color: #00ff87;
     }
     
-    .metric-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(0, 255, 135, 0.1), transparent);
-        transition: left 0.5s;
-    }
-    
-    .metric-card:hover::before {
-        left: 100%;
-    }
-    
     /* Status indicators */
     .status-open {
         background: linear-gradient(135deg, #00ff87, #00cc6a);
@@ -120,37 +105,6 @@ st.markdown("""
         font-weight: 600;
         display: inline-block;
         box-shadow: 0 4px 15px rgba(255, 165, 2, 0.4);
-    }
-    
-    /* Confidence badges */
-    .confidence-high {
-        background: linear-gradient(135deg, #00ff87, #00cc6a);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 15px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-    
-    .confidence-medium {
-        background: linear-gradient(135deg, #ffa502, #ff9500);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 15px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        display: inline-block;
-    }
-    
-    .confidence-low {
-        background: linear-gradient(135deg, #ff6b6b, #ff5252);
-        color: white;
-        padding: 0.3rem 0.8rem;
-        border-radius: 15px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        display: inline-block;
     }
     
     /* Trade type badges */
@@ -233,11 +187,6 @@ st.markdown("""
         100% { left: 100%; }
     }
     
-    /* Sidebar styling */
-    .css-1d391kg {
-        background: linear-gradient(180deg, #0f1419 0%, #1a1f2e 100%);
-    }
-    
     /* Metrics styling */
     div[data-testid="metric-container"] {
         background: linear-gradient(145deg, #21262d 0%, #30363d 100%);
@@ -264,55 +213,6 @@ st.markdown("""
         box-shadow: 0 8px 25px rgba(0, 255, 135, 0.4);
         background: linear-gradient(135deg, #00cc6a, #00b356);
     }
-    
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        background: linear-gradient(90deg, #21262d, #30363d);
-        border-radius: 10px;
-        padding: 0.5rem;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: transparent;
-        border-radius: 8px;
-        color: #8b949e;
-        font-weight: 500;
-    }
-    
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(135deg, #00ff87, #60efff);
-        color: white;
-    }
-    
-    /* Success/Error messages */
-    .stSuccess {
-        background: linear-gradient(135deg, #00ff87, #00cc6a);
-        border: none;
-        border-radius: 10px;
-    }
-    
-    .stError {
-        background: linear-gradient(135deg, #ff4757, #ff3742);
-        border: none;
-        border-radius: 10px;
-    }
-    
-    .stInfo {
-        background: linear-gradient(135deg, #60efff, #4ecdc4);
-        border: none;
-        border-radius: 10px;
-    }
-    
-    .stWarning {
-        background: linear-gradient(135deg, #ffa502, #ff9500);
-        border: none;
-        border-radius: 10px;
-    }
-    
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -374,7 +274,7 @@ class RealMarketData:
         # Base prices for major symbols
         base_prices = {
             'TSLA': 245.67,
-            'NVDA': 465.89,  # Updated to realistic NVDA price
+            'NVDA': 465.89,
             'SPY': 565.23,
             'QQQ': 485.67,
             'AAPL': 175.43,
@@ -502,163 +402,14 @@ class RealMarketData:
             'next_open': market_open if now < market_open else market_open + timedelta(days=1),
             'is_trading_hours': is_weekday and is_market_hours
         }
-    """Educational system with beautiful visualizations"""
-    
-    @staticmethod
-    def create_animated_header():
-        """Create stunning animated header"""
-        st.markdown("""
-        <div class="main-header">
-            🚀 Gamma Exposure Trading System
-        </div>
-        <div class="subtitle">
-            Master Professional Options Trading Through Market Maker Psychology
-        </div>
-        """, unsafe_allow_html=True)
-    
-    @staticmethod
-    def create_market_maker_visualization():
-        """Interactive market maker psychology chart"""
-        
-        # Create interactive demo
-        col1, col2 = st.columns([2, 1])
-        
-        with col2:
-            st.markdown("### 🎯 Interactive Demo")
-            price = st.slider("Stock Price ($)", 90, 110, 100, key="mm_demo")
-            gamma_flip = st.slider("Gamma Flip ($)", 85, 105, 95, key="flip_demo")
-        
-        with col1:
-            # Create beautiful visualization
-            fig = go.Figure()
-            
-            # Add zones
-            fig.add_shape(
-                type="rect",
-                x0=90, x1=gamma_flip, y0=0, y1=1,
-                fillcolor="rgba(255, 107, 107, 0.2)",
-                line=dict(width=0),
-                name="Squeeze Zone"
-            )
-            
-            fig.add_shape(
-                type="rect",
-                x0=gamma_flip, x1=110, y0=0, y1=1,
-                fillcolor="rgba(78, 205, 196, 0.2)",
-                line=dict(width=0),
-                name="Premium Zone"
-            )
-            
-            # Add current price line
-            fig.add_vline(
-                x=price,
-                line_dash="solid",
-                line_color="#00ff87",
-                line_width=3,
-                annotation_text=f"Current Price: ${price}",
-                annotation_position="top"
-            )
-            
-            # Add gamma flip line
-            fig.add_vline(
-                x=gamma_flip,
-                line_dash="dash",
-                line_color="#ff9500",
-                line_width=2,
-                annotation_text=f"Gamma Flip: ${gamma_flip}",
-                annotation_position="bottom"
-            )
-            
-            # Styling
-            fig.update_layout(
-                title={
-                    'text': '🎯 Market Maker Psychology Zones',
-                    'x': 0.5,
-                    'font': {'size': 20, 'color': 'white'}
-                },
-                xaxis_title="Stock Price ($)",
-                yaxis=dict(visible=False),
-                template="plotly_dark",
-                height=300,
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                showlegend=False
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Add explanation with beautiful formatting
-        if price < gamma_flip:
-            st.markdown("""
-            <div class="opportunity-card opportunity-high">
-                <h3>🚀 SQUEEZE ZONE ACTIVATED!</h3>
-                <p><strong>What's Happening:</strong> Market makers will amplify every move up! Perfect for buying calls.</p>
-                <p><strong>Strategy:</strong> Buy ATM or OTM calls for explosive gains</p>
-                <p><strong>Expected Move:</strong> 2-5x leverage on stock moves</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="opportunity-card opportunity-medium">
-                <h3>🛡️ PREMIUM SELLING ZONE</h3>
-                <p><strong>What's Happening:</strong> Market makers will dampen volatility. Perfect for selling options.</p>
-                <p><strong>Strategy:</strong> Sell calls/puts or iron condors</p>
-                <p><strong>Expected Move:</strong> Time decay and volatility compression</p>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    @staticmethod
-    def show_strategy_cards():
-        """Beautiful strategy overview cards"""
-        st.markdown("### 💡 Three Profitable Strategies")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("""
-            <div class="opportunity-card">
-                <div class="trade-squeeze">🚀 SQUEEZE PLAYS</div>
-                <h4 style="color: #00ff87; margin-top: 1rem;">Buy Calls/Puts</h4>
-                <p><strong>When:</strong> Below gamma flip + negative GEX</p>
-                <p><strong>Why:</strong> Market makers amplify moves</p>
-                <p><strong>Target:</strong> 50-100% gains in 1-3 days</p>
-                <p><strong>Risk:</strong> Can lose 50% quickly</p>
-                <div class="progress-bar" style="margin-top: 1rem;"></div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div class="opportunity-card">
-                <div class="trade-premium">🛡️ PREMIUM SELLING</div>
-                <h4 style="color: #4ecdc4; margin-top: 1rem;">Sell Calls/Puts</h4>
-                <p><strong>When:</strong> Above flip + positive GEX</p>
-                <p><strong>Why:</strong> Market makers suppress moves</p>
-                <p><strong>Target:</strong> 25-50% premium collection</p>
-                <p><strong>Risk:</strong> Assignment if walls break</p>
-                <div class="progress-bar" style="margin-top: 1rem;"></div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div class="opportunity-card">
-                <div class="trade-condor">⚖️ IRON CONDORS</div>
-                <h4 style="color: #a55eea; margin-top: 1rem;">Sell Both Sides</h4>
-                <p><strong>When:</strong> High positive GEX + wide walls</p>
-                <p><strong>Why:</strong> Price trapped between walls</p>
-                <p><strong>Target:</strong> 20-40% premium collection</p>
-                <p><strong>Risk:</strong> Big move breaks setup</p>
-                <div class="progress-bar" style="margin-top: 1rem;"></div>
-            </div>
-            """, unsafe_allow_html=True)
 
-class GEXEducationalSystem:
-    """Enhanced mock trading with beautiful visualizations"""
+class EnhancedMockTradingAccount:
+    """Enhanced mock trading with REAL market data integration"""
     
     def __init__(self):
         self.initial_balance = 100000
         self.last_update_time = datetime.now()
+        self.market_data = RealMarketData()
         
         # Initialize session state
         if 'portfolio_history' not in st.session_state:
@@ -671,86 +422,219 @@ class GEXEducationalSystem:
             st.session_state.auto_trading_enabled = False
         if 'last_analysis_time' not in st.session_state:
             st.session_state.last_analysis_time = datetime.now() - timedelta(minutes=30)
+        if 'real_market_data' not in st.session_state:
+            st.session_state.real_market_data = {}
     
-    def create_beautiful_portfolio_chart(self):
-        """Create stunning portfolio performance chart"""
-        if len(st.session_state.portfolio_history) < 2:
-            # Create sample data for demo
-            dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
-            values = [self.initial_balance]
+    def get_real_opportunities(self) -> List[Dict]:
+        """Generate opportunities using REAL market data"""
+        
+        # Symbols to analyze
+        symbols = ['TSLA', 'NVDA', 'SPY', 'QQQ', 'AAPL', 'AMD']
+        
+        # Fetch real market data
+        with st.spinner('🔄 Fetching real market data...'):
+            market_data = self.market_data.get_real_stock_data(symbols)
+            st.session_state.real_market_data = market_data
+        
+        opportunities = []
+        
+        for symbol, data in market_data.items():
+            current_price = data['current_price']
+            change_pct = data['change_pct']
+            volume = data['volume']
+            avg_volume = data['avg_volume']
             
-            for i in range(1, len(dates)):
-                change = np.random.normal(0, 0.02) * values[-1]
-                values.append(max(values[-1] + change, self.initial_balance * 0.8))
+            # Calculate gamma levels based on real price
+            gamma_data = self.market_data.calculate_realistic_gamma_levels(
+                symbol, current_price
+            )
             
-            sample_history = [{'timestamp': date, 'total_value': value} for date, value in zip(dates, values)]
-        else:
-            sample_history = st.session_state.portfolio_history
+            # Determine setup type based on real market structure
+            distance_from_flip = ((current_price - gamma_data['gamma_flip']) / 
+                                gamma_data['gamma_flip']) * 100
+            
+            # High volume indicates potential opportunity
+            volume_spike = volume > (avg_volume * 1.5) if avg_volume > 0 else False
+            
+            # Generate confidence score based on multiple factors
+            confidence_factors = []
+            
+            # Distance from gamma flip
+            if abs(distance_from_flip) > 2:
+                confidence_factors.append(15)  # Clear direction
+            
+            # Volume
+            if volume_spike:
+                confidence_factors.append(20)  # High interest
+            
+            # Price movement
+            if abs(change_pct) > 1:
+                confidence_factors.append(15)  # Significant move
+            
+            # Gamma structure strength
+            if abs(gamma_data['net_gex']) > 500000000:
+                confidence_factors.append(25)  # Strong gamma
+            
+            # Base confidence
+            base_confidence = 45 + sum(confidence_factors)
+            confidence_score = min(base_confidence + random.randint(-5, 10), 95)
+            
+            # Determine strategy based on real gamma structure
+            if gamma_data['net_gex'] < -300000000 and distance_from_flip < -1:
+                # Negative GEX + below flip = Squeeze setup
+                structure_type = 'SQUEEZE_SETUP'
+                trade_type = 'LONG_CALLS'
+                recommendation = f"BUY CALLS - Squeeze potential below ${gamma_data['gamma_flip']:.2f}"
+                explanation = f"{symbol} trading below gamma flip with negative GEX. Dealer hedging will amplify upward moves."
+            
+            elif gamma_data['net_gex'] > 1000000000 and current_price >= gamma_data['call_wall'] * 0.98:
+                # Positive GEX + near call wall = Premium selling
+                structure_type = 'PREMIUM_SELLING_SETUP'
+                trade_type = 'CALL_SELLING'
+                recommendation = f"SELL ${gamma_data['call_wall']:.0f} CALLS - Strong resistance"
+                explanation = f"{symbol} approaching call wall at ${gamma_data['call_wall']:.2f} with high positive GEX."
+            
+            elif gamma_data['net_gex'] > 1500000000 and abs(distance_from_flip) < 1:
+                # High positive GEX + near flip = Iron condor
+                structure_type = 'IRON_CONDOR_SETUP'
+                trade_type = 'IRON_CONDOR'
+                recommendation = f"IRON CONDOR ${gamma_data['put_wall']:.0f}/{gamma_data['call_wall']:.0f}"
+                explanation = f"{symbol} trapped between gamma walls with massive positive GEX."
+            
+            else:
+                # Default to most likely setup based on GEX
+                if gamma_data['net_gex'] < 0:
+                    structure_type = 'POTENTIAL_SQUEEZE'
+                    trade_type = 'LONG_CALLS'
+                    recommendation = f"WATCH FOR SQUEEZE - Monitor ${gamma_data['gamma_flip']:.2f} level"
+                    explanation = f"{symbol} has negative GEX but needs better positioning."
+                else:
+                    structure_type = 'PREMIUM_SELLING_SETUP' 
+                    trade_type = 'CALL_SELLING'
+                    recommendation = f"PREMIUM SELLING - Positive GEX environment"
+                    explanation = f"{symbol} in positive GEX regime, suitable for premium strategies."
+            
+            # Calculate realistic option premium
+            volatility = min(abs(change_pct) * 0.1 + 0.25, 0.8)  # 25% base + movement
+            expected_premium = current_price * volatility * 0.08 * random.uniform(0.8, 1.2)
+            
+            # Only include opportunities with reasonable confidence
+            if confidence_score >= 60:
+                opportunity = {
+                    'symbol': symbol,
+                    'current_price': current_price,
+                    'gamma_flip': gamma_data['gamma_flip'],
+                    'distance_pct': distance_from_flip,
+                    'net_gex': gamma_data['net_gex'],
+                    'call_wall': gamma_data['call_wall'],
+                    'put_wall': gamma_data['put_wall'],
+                    'structure_type': structure_type,
+                    'confidence_score': confidence_score,
+                    'trade_type': trade_type,
+                    'recommendation': recommendation,
+                    'explanation': explanation,
+                    'expected_premium': max(expected_premium, 0.50),
+                    'days_to_expiry': random.choice([1, 2, 3, 5, 7]),
+                    'emoji': self._get_emoji(symbol),
+                    'trend': 'up' if change_pct > 0.5 else 'down' if change_pct < -0.5 else 'sideways',
+                    'volume_spike': volume_spike,
+                    'change_pct': change_pct,
+                    'volume': volume,
+                    'real_data_timestamp': data['last_updated']
+                }
+                
+                opportunities.append(opportunity)
         
-        df = pd.DataFrame(sample_history)
+        # Sort by confidence score
+        opportunities.sort(key=lambda x: x['confidence_score'], reverse=True)
         
-        # Create subplot with secondary y-axis
-        fig = make_subplots(
-            rows=2, cols=1,
-            row_heights=[0.7, 0.3],
-            vertical_spacing=0.05,
-            subplot_titles=("Portfolio Value", "Daily Returns %")
-        )
+        return opportunities[:5]  # Return top 5 opportunities
+    
+    def _get_emoji(self, symbol: str) -> str:
+        """Get appropriate emoji for symbol"""
+        emoji_map = {
+            'TSLA': '⚡',
+            'NVDA': '🎯', 
+            'SPY': '🇺🇸',
+            'QQQ': '💻',
+            'AAPL': '🍎',
+            'AMD': '🔥',
+            'MSFT': '💼'
+        }
+        return emoji_map.get(symbol, '📈')
+    
+    def calculate_real_option_value(self, trade: Dict) -> float:
+        """Calculate option value based on REAL stock movement"""
+        try:
+            # Get current real stock price
+            symbol = trade['symbol']
+            current_data = st.session_state.real_market_data.get(symbol)
+            
+            if not current_data:
+                # Fallback to simulation if no real data
+                return self._simulate_option_value(trade)
+            
+            current_price = current_data['current_price']
+            entry_stock_price = trade.get('entry_stock_price', current_price)
+            
+            # Calculate real stock movement
+            if entry_stock_price > 0:
+                stock_move_pct = (current_price - entry_stock_price) / entry_stock_price
+            else:
+                stock_move_pct = 0
+            
+            # Days held affects time decay
+            days_held = trade.get('days_held', 0)
+            
+            # Calculate option value based on real movement
+            entry_price = trade['entry_price']
+            
+            if trade['trade_type'] == 'LONG_CALLS':
+                # Calls benefit from upward moves
+                if stock_move_pct > 0:
+                    # Positive moves get amplified by gamma
+                    gamma_multiplier = 1 + (stock_move_pct * 3.5)  # 3.5x leverage
+                    option_multiplier = min(gamma_multiplier, 4.0)
+                else:
+                    # Negative moves hurt options
+                    option_multiplier = max(1 + (stock_move_pct * 2.5), 0.05)
+            
+            elif trade['trade_type'] == 'CALL_SELLING':
+                # Sold calls decay unless stock moves up significantly
+                time_decay = min(days_held * 0.12, 0.8)  # 12% per day
+                
+                if stock_move_pct > 0.02:  # Stock up >2%
+                    option_multiplier = 1 + (stock_move_pct * 4)  # Bad for sold calls
+                else:
+                    option_multiplier = max(1 - time_decay, 0.15)  # Time decay helps
+            
+            else:  # IRON_CONDOR
+                # Condors benefit from low movement and time decay
+                volatility_impact = abs(stock_move_pct) * 5  # Volatility hurts
+                time_decay = min(days_held * 0.08, 0.6)  # 8% per day helps
+                
+                option_multiplier = max(1 - time_decay + volatility_impact, 0.2)
+            
+            # Apply realistic time decay
+            time_factor = max(1 - (days_held * 0.05), 0.2)
+            
+            current_value = entry_price * option_multiplier * time_factor
+            return max(current_value, 0.01)
+            
+        except Exception as e:
+            return self._simulate_option_value(trade)
+    
+    def _simulate_option_value(self, trade: Dict) -> float:
+        """Fallback simulation if real data unavailable"""
+        days_held = trade.get('days_held', 0)
+        entry_price = trade['entry_price']
         
-        # Portfolio value line with gradient fill
-        fig.add_trace(
-            go.Scatter(
-                x=df['timestamp'],
-                y=df['total_value'],
-                mode='lines',
-                name='Portfolio Value',
-                line=dict(color='#00ff87', width=3),
-                fill='tonexty',
-                fillcolor='rgba(0, 255, 135, 0.1)',
-                hovertemplate='<b>%{y:$,.0f}</b><br>%{x}<extra></extra>'
-            ),
-            row=1, col=1
-        )
+        # Simple simulation
+        random_move = random.uniform(-0.15, 0.20)  # -15% to +20%
+        time_decay = min(days_held * 0.08, 0.7)
         
-        # Add starting value line
-        fig.add_hline(
-            y=self.initial_balance,
-            line_dash="dash",
-            line_color="rgba(255, 255, 255, 0.5)",
-            annotation_text=f"Starting: ${self.initial_balance:,}",
-            annotation_position="top left",
-            row=1, col=1
-        )
-        
-        # Daily returns bar chart
-        daily_returns = df['total_value'].pct_change() * 100
-        colors = ['#00ff87' if x >= 0 else '#ff4757' for x in daily_returns]
-        
-        fig.add_trace(
-            go.Bar(
-                x=df['timestamp'],
-                y=daily_returns,
-                name='Daily Returns',
-                marker_color=colors,
-                hovertemplate='<b>%{y:.2f}%</b><br>%{x}<extra></extra>'
-            ),
-            row=2, col=1
-        )
-        
-        # Styling
-        fig.update_layout(
-            height=500,
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            showlegend=False,
-            margin=dict(l=0, r=0, t=50, b=0)
-        )
-        
-        fig.update_xaxes(showgrid=False, color='white')
-        fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.1)', color='white')
-        
-        return fig
+        multiplier = max(1 + random_move - time_decay, 0.1)
+        return entry_price * multiplier
     
     def update_open_trades_with_real_data(self):
         """Update all open trades using real market data"""
@@ -818,72 +702,131 @@ class GEXEducationalSystem:
             return f"⚠️ **LOSING**: Down {pnl_pct:.1f}%. Stock moved {stock_change:+.1f}% against us - may need to cut losses."
         else:
             return f"📊 **DEVELOPING**: {pnl_pct:+.1f}% after {days_held} days. Stock: {stock_change:+.1f}%. Let it develop."
-        """Generate visually rich opportunities"""
+    
+    def check_exit_conditions(self, trade: Dict) -> Optional[str]:
+        """Check if trade should be automatically closed"""
+        pnl_pct = trade.get('unrealized_pnl_pct', 0)
+        days_held = trade.get('days_held', 0)
+        confidence = trade.get('confidence_score', 70)
         
-        opportunities = [
-            {
-                'symbol': 'TSLA',
-                'current_price': 245.67,
-                'gamma_flip': 238.50,
-                'distance_pct': 3.01,
-                'net_gex': 1250000000,
-                'call_wall': 250.00,
-                'put_wall': 235.00,
-                'structure_type': 'PREMIUM_SELLING_SETUP',
-                'confidence_score': 88,
-                'trade_type': 'CALL_SELLING',
-                'recommendation': 'SELL $250 CALLS',
-                'explanation': 'TSLA approaching call wall with massive positive GEX. Market makers will defend this level.',
-                'expected_premium': 3.20,
-                'days_to_expiry': 3,
-                'emoji': '⚡',
-                'trend': 'up',
-                'volume_spike': True
-            },
-            {
-                'symbol': 'NVDA', 
-                'current_price': 118.45,
-                'gamma_flip': 125.20,
-                'distance_pct': -5.39,
-                'net_gex': -850000000,
-                'call_wall': 130.00,
-                'put_wall': 115.00,
-                'structure_type': 'SQUEEZE_SETUP',
-                'confidence_score': 93,
-                'trade_type': 'LONG_CALLS',
-                'recommendation': 'BUY $120/$125 CALLS',
-                'explanation': 'NVDA below gamma flip with negative GEX. Any move up gets amplified by dealer hedging.',
-                'expected_premium': 2.85,
-                'days_to_expiry': 2,
-                'emoji': '🎯',
-                'trend': 'down',
-                'volume_spike': True
-            },
-            {
-                'symbol': 'SPY',
-                'current_price': 565.23,
-                'gamma_flip': 563.00,
-                'distance_pct': 0.40,
-                'net_gex': 2100000000,
-                'call_wall': 570.00,
-                'put_wall': 560.00,
-                'structure_type': 'IRON_CONDOR_SETUP',
-                'confidence_score': 76,
-                'trade_type': 'IRON_CONDOR',
-                'recommendation': 'IRON CONDOR 560/570',
-                'explanation': 'SPY has massive positive GEX with clear walls. Perfect range-bound setup.',
-                'expected_premium': 1.50,
-                'days_to_expiry': 7,
-                'emoji': '🎪',
-                'trend': 'sideways',
-                'volume_spike': False
-            }
-        ]
+        # Profit taking rules
+        if pnl_pct >= 100:  # 100% gain
+            return "Profit Target (100%)"
         
-        return opportunities
+        if pnl_pct >= 50 and days_held >= 2:  # 50% gain after 2 days
+            return "Profit Target (50%+)"
+        
+        # Stop loss rules
+        if pnl_pct <= -50:  # 50% loss
+            return "Stop Loss (50%)"
+        
+        # Time-based exits
+        if days_held >= 7:  # Max 7 days
+            return "Time Stop (7 days)"
+        
+        return None
+    
+    def close_trade(self, trade: Dict, exit_reason: str):
+        """Close a trade and record the result"""
+        exit_trade = trade.copy()
+        exit_trade['exit_date'] = datetime.now().date()
+        exit_trade['exit_price'] = trade['current_value']
+        exit_trade['exit_reason'] = exit_reason
+        exit_trade['realized_pnl'] = trade['unrealized_pnl']
+        exit_trade['realized_pnl_pct'] = trade['unrealized_pnl_pct']
+        exit_trade['status'] = 'CLOSED'
+        
+        st.session_state.closed_trades.append(exit_trade)
+    
+    def add_trade(self, opportunity: Dict, manual: bool = False):
+        """Add trade with real market context"""
+        # Calculate position size (2% risk per trade)
+        balance = self.get_current_balance_with_real_data()
+        risk_amount = balance['total_value'] * 0.02
+        
+        entry_price = opportunity['expected_premium']
+        quantity = max(1, int(risk_amount / (entry_price * 100)))
+        
+        trade = {
+            'trade_id': str(uuid.uuid4()),
+            'symbol': opportunity['symbol'],
+            'trade_type': opportunity['trade_type'],
+            'entry_date': datetime.now().date(),
+            'entry_timestamp': datetime.now(),
+            'entry_price': entry_price,
+            'quantity': quantity,
+            'confidence_score': opportunity['confidence_score'],
+            'setup_type': opportunity['structure_type'],
+            'recommendation': opportunity['recommendation'],
+            'explanation': opportunity['explanation'],
+            'days_held': 0,
+            'current_value': entry_price,
+            'unrealized_pnl': 0,
+            'unrealized_pnl_pct': 0,
+            'manual_trade': manual,
+            'status': 'OPEN',
+            # Real market data
+            'entry_stock_price': opportunity['current_price'],
+            'gamma_flip': opportunity['gamma_flip'],
+            'call_wall': opportunity.get('call_wall'),
+            'put_wall': opportunity.get('put_wall'),
+        }
+        
+        st.session_state.open_trades.append(trade)
+        
+        # Show success message
+        if manual:
+            st.success(f"✅ **TRADE EXECUTED**: {quantity} contracts of {opportunity['symbol']} {opportunity['trade_type']}")
+        
+        return True
+    
+    def get_current_balance_with_real_data(self) -> Dict:
+        """Calculate balance using real market data for open positions"""
+        # Update trades with latest real data first
+        self.update_open_trades_with_real_data()
+        
+        cash_balance = self.initial_balance
+        positions_value = 0
+        unrealized_pnl = 0
+        realized_pnl = 0
+        
+        # Calculate open positions with real data
+        for trade in st.session_state.open_trades:
+            invested = trade['entry_price'] * trade['quantity'] * 100
+            current_val = trade['current_value'] * trade['quantity'] * 100
+            
+            cash_balance -= invested
+            positions_value += current_val
+            unrealized_pnl += trade['unrealized_pnl']
+        
+        # Add realized P&L
+        for trade in st.session_state.closed_trades:
+            realized_pnl += trade['realized_pnl']
+        
+        total_value = cash_balance + positions_value + realized_pnl
+        total_return_pct = ((total_value - self.initial_balance) / self.initial_balance) * 100
+        
+        # Calculate statistics
+        if st.session_state.closed_trades:
+            winning_trades = len([t for t in st.session_state.closed_trades if t['realized_pnl'] > 0])
+            win_rate = (winning_trades / len(st.session_state.closed_trades)) * 100
+        else:
+            win_rate = 0
+        
+        return {
+            'total_value': total_value,
+            'cash_balance': cash_balance,
+            'positions_value': positions_value,
+            'realized_pnl': realized_pnl,
+            'unrealized_pnl': unrealized_pnl,
+            'total_return_pct': total_return_pct,
+            'open_trades_count': len(st.session_state.open_trades),
+            'closed_trades_count': len(st.session_state.closed_trades),
+            'win_rate': win_rate
+        }
     
     def create_opportunity_card(self, opp: Dict, index: int):
-        """Create beautiful opportunity cards"""
+        """Create beautiful opportunity cards with real data"""
         
         # Determine confidence styling
         if opp['confidence_score'] >= 85:
@@ -916,7 +859,7 @@ class GEXEducationalSystem:
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <h2 style="margin: 0; color: #00ff87; font-size: 1.8rem;">{opp['emoji']} {opp['symbol']}</h2>
-                    <div class="{confidence_class}">{confidence_emoji} {opp['confidence_score']}% CONFIDENCE</div>
+                    <div style="background: linear-gradient(135deg, {'#00ff87, #00cc6a' if opp['confidence_score'] >= 85 else '#ffa502, #ff9500' if opp['confidence_score'] >= 75 else '#ff6b6b, #ff5252'}); color: white; padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.8rem; font-weight: 600;">{confidence_emoji} {opp['confidence_score']}% CONFIDENCE</div>
                 </div>
                 <div class="{trade_class}">{opp['trade_type'].replace('_', ' ')}</div>
             </div>
@@ -925,6 +868,7 @@ class GEXEducationalSystem:
                 <div>
                     <div style="color: #8b949e; font-size: 0.9rem;">Current Price</div>
                     <div style="font-size: 1.3rem; font-weight: 600; color: #00ff87;">${opp['current_price']:.2f}</div>
+                    <div style="font-size: 0.8rem; color: {'#00ff87' if opp['change_pct'] >= 0 else '#ff4757'};">({opp['change_pct']:+.1f}%)</div>
                 </div>
                 <div>
                     <div style="color: #8b949e; font-size: 0.9rem;">Gamma Flip</div>
@@ -947,11 +891,75 @@ class GEXEducationalSystem:
                     <div style="color: #8b949e;">Expiry: <span style="color: #00ff87; font-weight: 600;">{opp['days_to_expiry']}d</span></div>
                     <div style="color: #8b949e; font-size: 0.9rem;">{volume_indicator}</div>
                 </div>
+                <div style="color: #8b949e; font-size: 0.8rem;">
+                    Real data: {opp['real_data_timestamp'].strftime('%I:%M %p')}
+                </div>
             </div>
         </div>
         """
         
         st.markdown(card_html, unsafe_allow_html=True)
+    
+    def create_beautiful_portfolio_chart(self):
+        """Create portfolio performance chart"""
+        # Create sample data if none exists
+        if len(st.session_state.portfolio_history) < 2:
+            dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
+            values = [self.initial_balance]
+            
+            for i in range(1, len(dates)):
+                change = np.random.normal(0, 0.02) * values[-1]
+                values.append(max(values[-1] + change, self.initial_balance * 0.8))
+            
+            sample_history = [{'timestamp': date, 'total_value': value} for date, value in zip(dates, values)]
+        else:
+            sample_history = st.session_state.portfolio_history
+        
+        df = pd.DataFrame(sample_history)
+        
+        fig = go.Figure()
+        
+        # Portfolio value line with gradient fill
+        fig.add_trace(
+            go.Scatter(
+                x=df['timestamp'],
+                y=df['total_value'],
+                mode='lines+markers',
+                name='Portfolio Value',
+                line=dict(color='#00ff87', width=3),
+                fill='tonexty',
+                fillcolor='rgba(0, 255, 135, 0.1)',
+                hovertemplate='<b>%{y:$,.0f}</b><br>%{x}<extra></extra>'
+            )
+        )
+        
+        # Add starting value line
+        fig.add_hline(
+            y=self.initial_balance,
+            line_dash="dash",
+            line_color="rgba(255, 255, 255, 0.5)",
+            annotation_text=f"Starting: ${self.initial_balance:,}",
+            annotation_position="top left"
+        )
+        
+        # Styling
+        fig.update_layout(
+            title={
+                'text': 'Portfolio Performance Over Time',
+                'x': 0.5,
+                'font': {'size': 20, 'color': 'white'}
+            },
+            height=400,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            showlegend=False,
+            margin=dict(l=0, r=0, t=50, b=0),
+            xaxis=dict(showgrid=False, color='white'),
+            yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)', color='white', tickformat='$,.0f')
+        )
+        
+        return fig
 
 def display_morning_analysis():
     """Morning analysis with REAL market data"""
@@ -1057,8 +1065,7 @@ def display_morning_analysis():
     # Show opportunities using real data
     account = EnhancedMockTradingAccount()
     
-    with st.spinner('🔄 Analyzing real market data for gamma opportunities...'):
-        opportunities = account.get_real_opportunities()
+    opportunities = account.get_real_opportunities()
     
     if not opportunities:
         st.warning("📊 **No high-confidence opportunities found in current market conditions.** This is normal - we only show setups with 60%+ confidence.")
@@ -1131,119 +1138,6 @@ def display_morning_analysis():
                 st.info(f"**Real Market Data:** ${real_data['current_price']:.2f} ({real_data['change_pct']:+.1f}%) | Volume: {volume_status}")
         
         st.markdown("---")
-    
-    # Beautiful header
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="background: linear-gradient(90deg, #00ff87, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; margin-bottom: 0.5rem;">
-            🌅 Morning Gamma Analysis
-        </h1>
-        <p style="color: #8b949e; font-size: 1.1rem;">Live Trading Opportunities</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Market status with beautiful indicators
-    current_time = datetime.now()
-    
-    if 9 <= current_time.hour < 16 and current_time.weekday() < 5:
-        status_html = '<div class="status-open">🟢 MARKET OPEN</div>'
-    elif current_time.weekday() >= 5:
-        status_html = '<div class="status-closed">🔴 WEEKEND - MARKETS CLOSED</div>'
-    else:
-        status_html = '<div class="status-premarket">🟡 PRE/AFTER MARKET</div>'
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="color: #8b949e; font-size: 0.9rem;">Last Analysis</div>
-            <div style="font-size: 1.2rem; font-weight: 600; color: #00ff87;">09:15 AM ET</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="color: #8b949e; font-size: 0.9rem;">Current Time</div>
-            <div style="font-size: 1.2rem; font-weight: 600; color: #60efff;">{current_time.strftime('%I:%M %p ET')}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="color: #8b949e; font-size: 0.9rem;">Market Status</div>
-            <div style="margin-top: 0.5rem;">{status_html}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div style="color: #8b949e; font-size: 0.9rem;">Next Analysis</div>
-            <div style="font-size: 1.2rem; font-weight: 600; color: #ffa502;">09:15 AM Tomorrow</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Analysis process with beautiful icons
-    st.markdown("""
-    <div style="background: linear-gradient(145deg, #1c2128, #21262d); padding: 2rem; border-radius: 16px; margin: 2rem 0;">
-        <h3 style="color: #00ff87; margin-bottom: 1.5rem; display: flex; align-items: center;">
-            <span style="margin-right: 1rem;">📊</span>How Our Analysis Works
-        </h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-            <div style="display: flex; align-items: center; padding: 1rem; background: rgba(0, 255, 135, 0.1); border-radius: 8px;">
-                <span style="font-size: 1.5rem; margin-right: 1rem;">🔍</span>
-                <div>
-                    <div style="font-weight: 600; color: white;">Scan 100+ Stocks</div>
-                    <div style="color: #8b949e; font-size: 0.9rem;">For gamma exposure patterns</div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; padding: 1rem; background: rgba(96, 239, 255, 0.1); border-radius: 8px;">
-                <span style="font-size: 1.5rem; margin-right: 1rem;">🧮</span>
-                <div>
-                    <div style="font-weight: 600; color: white;">Calculate Levels</div>
-                    <div style="color: #8b949e; font-size: 0.9rem;">Gamma flip points & walls</div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; padding: 1rem; background: rgba(255, 165, 2, 0.1); border-radius: 8px;">
-                <span style="font-size: 1.5rem; margin-right: 1rem;">🎯</span>
-                <div>
-                    <div style="font-weight: 600; color: white;">Identify Setups</div>
-                    <div style="color: #8b949e; font-size: 0.9rem;">3-5 highest probability trades</div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; padding: 1rem; background: rgba(255, 71, 87, 0.1); border-radius: 8px;">
-                <span style="font-size: 1.5rem; margin-right: 1rem;">🚨</span>
-                <div>
-                    <div style="font-weight: 600; color: white;">Alert & Rank</div>
-                    <div style="color: #8b949e; font-size: 0.9rem;">90%+ confidence auto-trades</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Show opportunities
-    account = EnhancedMockTradingAccount()
-    opportunities = account.get_realistic_opportunities()
-    
-    st.markdown("### 🎯 Today's Premium Opportunities")
-    
-    for i, opp in enumerate(opportunities):
-        account.create_opportunity_card(opp, i)
-        
-        # Add trade button
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            if st.button(f"📈 Execute Trade", key=f"trade_{i}", type="primary"):
-                st.success(f"🎉 Trade executed: {opp['symbol']} {opp['trade_type']}")
-        with col2:
-            if st.button(f"📊 View Analysis", key=f"analysis_{i}"):
-                st.info(f"📈 Detailed analysis for {opp['symbol']} coming soon!")
 
 def display_enhanced_portfolio():
     """Portfolio with real market data integration"""
@@ -1356,11 +1250,8 @@ def display_enhanced_portfolio():
                     <strong>📊 Real-Time Analysis:</strong> {trade.get('analysis', 'Position tracking with live market data.')}
                 </div>
                 
-                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
-                    <button style="background: linear-gradient(135deg, #ff4757, #ff3742); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer;">
-                        Close Position
-                    </button>
-                    <div style="color: #8b949e; font-size: 0.9rem; display: flex; align-items: center;">
+                <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="color: #8b949e; font-size: 0.9rem;">
                         Last updated: {real_data.get('last_updated', datetime.now()).strftime('%I:%M %p')} ET
                     </div>
                 </div>
@@ -1387,157 +1278,19 @@ def display_enhanced_portfolio():
             st.metric("Win Rate", f"{balance['win_rate']:.1f}%")
         with col3:
             st.metric("Net Realized P&L", f"${balance['realized_pnl']:,.0f}")
-    
-    def get_current_balance_with_real_data(self) -> Dict:
-        """Calculate balance using real market data for open positions"""
-        # Update trades with latest real data first
-        self.update_open_trades_with_real_data()
-        
-        cash_balance = self.initial_balance
-        positions_value = 0
-        unrealized_pnl = 0
-        realized_pnl = 0
-        
-        # Calculate open positions with real data
-        for trade in st.session_state.open_trades:
-            invested = trade['entry_price'] * trade['quantity'] * 100
-            current_val = trade['current_value'] * trade['quantity'] * 100
-            
-            cash_balance -= invested
-            positions_value += current_val
-            unrealized_pnl += trade['unrealized_pnl']
-        
-        # Add realized P&L
-        for trade in st.session_state.closed_trades:
-            realized_pnl += trade['realized_pnl']
-        
-        total_value = cash_balance + positions_value + realized_pnl
-        total_return_pct = ((total_value - self.initial_balance) / self.initial_balance) * 100
-        
-        # Calculate statistics
-        if st.session_state.closed_trades:
-            winning_trades = len([t for t in st.session_state.closed_trades if t['realized_pnl'] > 0])
-            win_rate = (winning_trades / len(st.session_state.closed_trades)) * 100
-        else:
-            win_rate = 0
-        
-        return {
-            'total_value': total_value,
-            'cash_balance': cash_balance,
-            'positions_value': positions_value,
-            'realized_pnl': realized_pnl,
-            'unrealized_pnl': unrealized_pnl,
-            'total_return_pct': total_return_pct,
-            'open_trades_count': len(st.session_state.open_trades),
-            'closed_trades_count': len(st.session_state.closed_trades),
-            'win_rate': win_rate
-        }
-    
-    # Add the method to the class
-    EnhancedMockTradingAccount.get_current_balance_with_real_data = get_current_balance_with_real_data
-    """Stunning portfolio display"""
-    
-    # Beautiful header
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="background: linear-gradient(90deg, #00ff87, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; margin-bottom: 0.5rem;">
-            💰 $100K Gamma Trading Challenge
-        </h1>
-        <p style="color: #8b949e; font-size: 1.1rem;">Learn While You Earn - Master Professional Options Trading</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    account = EnhancedMockTradingAccount()
-    
-    # Create sample balance for demo
-    balance = {
-        'total_value': 108750,
-        'cash_balance': 85430,
-        'positions_value': 23320,
-        'realized_pnl': 3250,
-        'unrealized_pnl': 5500,
-        'total_return_pct': 8.75,
-        'open_trades_count': 3,
-        'closed_trades_count': 12,
-        'win_rate': 75.0,
-        'avg_winner': 45.2,
-        'avg_loser': -22.1
-    }
-    
-    # Portfolio metrics with beautiful cards
-    col1, col2, col3, col4 = st.columns(4)
-    
-    metrics_html = [
-        (f"${balance['total_value']:,.0f}", f"+{balance['total_return_pct']:.1f}%", "Portfolio Value", "#00ff87"),
-        (f"${balance['cash_balance']:,.0f}", "Available", "Cash Balance", "#60efff"),
-        (f"{balance['win_rate']:.0f}%", f"{balance['closed_trades_count']} trades", "Win Rate", "#ffa502"),
-        (f"+{balance['avg_winner']:.1f}%", f"{balance['avg_loser']:.1f}%", "Avg Winner/Loser", "#a55eea")
-    ]
-    
-    for i, (metric, delta, label, color) in enumerate(metrics_html):
-        with [col1, col2, col3, col4][i]:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div style="color: #8b949e; font-size: 0.9rem; margin-bottom: 0.5rem;">{label}</div>
-                <div style="font-size: 1.8rem; font-weight: 700; color: {color}; margin-bottom: 0.3rem;">{metric}</div>
-                <div style="color: #8b949e; font-size: 0.8rem;">{delta}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Auto-trading toggle
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        auto_trading = st.toggle("🤖 Enable Auto-Trading", value=False, key="auto_toggle")
-    
-    with col2:
-        if auto_trading:
-            st.markdown('<div class="status-open">🤖 AUTO-TRADING ACTIVE - Will execute 90%+ confidence trades</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="status-premarket">👤 MANUAL MODE - You choose which trades to execute</div>', unsafe_allow_html=True)
-    
-    # Portfolio performance chart
-    st.markdown("### 📈 Portfolio Performance")
-    fig = account.create_beautiful_portfolio_chart()
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Sample open positions
-    st.markdown("### 📊 Active Positions")
-    
-    sample_trades = [
-        {'symbol': 'NVDA', 'type': 'LONG CALLS', 'pnl': 15.2, 'days': 2, 'confidence': 93, 'analysis': '🎉 WINNING: Squeeze setup playing out perfectly!'},
-        {'symbol': 'TSLA', 'type': 'CALL SELLING', 'pnl': -8.4, 'days': 1, 'confidence': 88, 'analysis': '📊 DEVELOPING: Still early, let it develop'},
-        {'symbol': 'SPY', 'type': 'IRON CONDOR', 'pnl': 22.1, 'days': 4, 'confidence': 76, 'analysis': '✅ SUCCESS: Range-bound as predicted'}
-    ]
-    
-    for trade in sample_trades:
-        pnl_color = "#00ff87" if trade['pnl'] > 0 else "#ff4757"
-        pnl_emoji = "🟢" if trade['pnl'] > 0 else "🔴"
-        
-        st.markdown(f"""
-        <div class="opportunity-card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <h3 style="margin: 0; color: #00ff87;">{pnl_emoji} {trade['symbol']}</h3>
-                    <div class="trade-{'squeeze' if 'CALLS' in trade['type'] else 'premium'}">{trade['type']}</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 1.5rem; font-weight: 700; color: {pnl_color};">{trade['pnl']:+.1f}%</div>
-                    <div style="color: #8b949e; font-size: 0.9rem;">Day {trade['days']} • {trade['confidence']}% confidence</div>
-                </div>
-            </div>
-            <div style="margin-top: 1rem; padding: 1rem; background: rgba(0, 255, 135, 0.1); border-radius: 8px; border-left: 4px solid #00ff87;">
-                <strong>💡 Analysis:</strong> {trade['analysis']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
 def main():
-    """Main app with stunning design"""
+    """Main app with stunning design and complete functionality"""
     
-    # Create beautiful header
-    GEXEducationalSystem.create_animated_header()
+    # Create beautiful header directly
+    st.markdown("""
+    <div class="main-header">
+        🚀 Gamma Exposure Trading System
+    </div>
+    <div class="subtitle">
+        Master Professional Options Trading Through Market Maker Psychology
+    </div>
+    """, unsafe_allow_html=True)
     
     # Beautiful sidebar
     st.sidebar.markdown("""
@@ -1598,15 +1351,183 @@ def main():
             ### 🎯 How Market Makers Think with Gamma Exposure
             
             **Market makers are like bookies at a casino** - they want to make money on every trade while staying neutral to price direction.
+            
+            #### The Market Maker's Problem:
+            1. **They sell you options** but don't want to lose money if the stock moves
+            2. **They must hedge their risk** by buying/selling the underlying stock
+            3. **Gamma tells them HOW MUCH stock to buy/sell** when prices change
+            
+            #### The Magic of Gamma:
+            - **High Gamma = Big hedging moves** (creates volatility)
+            - **Low Gamma = Small hedging moves** (suppresses volatility)
+            - **Gamma Flip Point = Where the magic switches**
+            
+            #### Why This Creates Opportunities:
+            - 🚀 **Below flip point**: Market makers amplify moves (great for buying options)
+            - 🛡️ **Above flip point**: Market makers dampen moves (great for selling options)
+            - 🎯 **At walls**: Strong support/resistance levels
             """)
             
-            # Add beautiful explanation cards here
-            
         with tab2:
-            GEXEducationalSystem.show_strategy_cards()
+            # Strategy cards directly here
+            st.markdown("### 💡 Three Profitable Strategies")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.markdown("""
+                <div class="opportunity-card">
+                    <div class="trade-squeeze">🚀 SQUEEZE PLAYS</div>
+                    <h4 style="color: #00ff87; margin-top: 1rem;">Buy Calls/Puts</h4>
+                    <p><strong>When:</strong> Below gamma flip + negative GEX</p>
+                    <p><strong>Why:</strong> Market makers amplify moves</p>
+                    <p><strong>Target:</strong> 50-100% gains in 1-3 days</p>
+                    <p><strong>Risk:</strong> Can lose 50% quickly</p>
+                    <div class="progress-bar" style="margin-top: 1rem;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown("""
+                <div class="opportunity-card">
+                    <div class="trade-premium">🛡️ PREMIUM SELLING</div>
+                    <h4 style="color: #4ecdc4; margin-top: 1rem;">Sell Calls/Puts</h4>
+                    <p><strong>When:</strong> Above flip + positive GEX</p>
+                    <p><strong>Why:</strong> Market makers suppress moves</p>
+                    <p><strong>Target:</strong> 25-50% premium collection</p>
+                    <p><strong>Risk:</strong> Assignment if walls break</p>
+                    <div class="progress-bar" style="margin-top: 1rem;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col3:
+                st.markdown("""
+                <div class="opportunity-card">
+                    <div class="trade-condor">⚖️ IRON CONDORS</div>
+                    <h4 style="color: #a55eea; margin-top: 1rem;">Sell Both Sides</h4>
+                    <p><strong>When:</strong> High positive GEX + wide walls</p>
+                    <p><strong>Why:</strong> Price trapped between walls</p>
+                    <p><strong>Target:</strong> 20-40% premium collection</p>
+                    <p><strong>Risk:</strong> Big move breaks setup</p>
+                    <div class="progress-bar" style="margin-top: 1rem;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Entry criteria
+            st.markdown("### ✅ Exact Entry Criteria")
+            
+            st.markdown("""
+            #### 🚀 SQUEEZE SETUP CRITERIA:
+            - ✅ Net GEX < -500M (negative gamma environment)
+            - ✅ Price is 0.5-2% below gamma flip point
+            - ✅ Strong put wall within 1% below current price
+            - ✅ Major expiration < 5 days away
+            - ✅ Confidence score > 75%
+            
+            #### 🛡️ PREMIUM SELLING CRITERIA:
+            - ✅ Net GEX > +1B (positive gamma environment) 
+            - ✅ Price near or above call wall (within 0.5%)
+            - ✅ Call wall has >300M gamma concentration
+            - ✅ 2-5 days to expiration for theta decay
+            - ✅ Confidence score > 70%
+            
+            #### ⚖️ IRON CONDOR CRITERIA:
+            - ✅ Net GEX > +2B (very positive gamma)
+            - ✅ Call and put walls >3% apart
+            - ✅ 80%+ gamma concentrated at the walls
+            - ✅ 5-10 days to expiration
+            - ✅ IV rank < 50th percentile
+            """)
             
         with tab3:
-            GEXEducationalSystem.create_market_maker_visualization()
+            # Interactive demo directly here instead of method call
+            st.markdown("### 🎯 Interactive Demo: Gamma in Action")
+            
+            col1, col2 = st.columns([2, 1])
+            
+            with col2:
+                st.markdown("**🎮 Control the Demo:**")
+                price = st.slider("Stock Price ($)", 90, 110, 100, key="mm_demo")
+                gamma_flip = st.slider("Gamma Flip ($)", 85, 105, 95, key="flip_demo")
+            
+            with col1:
+                # Create beautiful visualization
+                fig = go.Figure()
+                
+                # Add zones
+                fig.add_shape(
+                    type="rect",
+                    x0=90, x1=gamma_flip, y0=0, y1=1,
+                    fillcolor="rgba(255, 107, 107, 0.2)",
+                    line=dict(width=0),
+                    name="Squeeze Zone"
+                )
+                
+                fig.add_shape(
+                    type="rect",
+                    x0=gamma_flip, x1=110, y0=0, y1=1,
+                    fillcolor="rgba(78, 205, 196, 0.2)",
+                    line=dict(width=0),
+                    name="Premium Zone"
+                )
+                
+                # Add current price line
+                fig.add_vline(
+                    x=price,
+                    line_dash="solid",
+                    line_color="#00ff87",
+                    line_width=3,
+                    annotation_text=f"Current Price: ${price}",
+                    annotation_position="top"
+                )
+                
+                # Add gamma flip line
+                fig.add_vline(
+                    x=gamma_flip,
+                    line_dash="dash",
+                    line_color="#ff9500",
+                    line_width=2,
+                    annotation_text=f"Gamma Flip: ${gamma_flip}",
+                    annotation_position="bottom"
+                )
+                
+                # Styling
+                fig.update_layout(
+                    title={
+                        'text': '🎯 Market Maker Psychology Zones',
+                        'x': 0.5,
+                        'font': {'size': 20, 'color': 'white'}
+                    },
+                    xaxis_title="Stock Price ($)",
+                    yaxis=dict(visible=False),
+                    template="plotly_dark",
+                    height=300,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Add explanation with beautiful formatting
+            if price < gamma_flip:
+                st.markdown("""
+                <div class="opportunity-card opportunity-high">
+                    <h3>🚀 SQUEEZE ZONE ACTIVATED!</h3>
+                    <p><strong>What's Happening:</strong> Market makers will amplify every move up! Perfect for buying calls.</p>
+                    <p><strong>Strategy:</strong> Buy ATM or OTM calls for explosive gains</p>
+                    <p><strong>Expected Move:</strong> 2-5x leverage on stock moves</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="opportunity-card opportunity-medium">
+                    <h3>🛡️ PREMIUM SELLING ZONE</h3>
+                    <p><strong>What's Happening:</strong> Market makers will dampen volatility. Perfect for selling options.</p>
+                    <p><strong>Strategy:</strong> Sell calls/puts or iron condors</p>
+                    <p><strong>Expected Move:</strong> Time decay and volatility compression</p>
+                </div>
+                """, unsafe_allow_html=True)
     
     elif page == "🌅 Morning Analysis":
         display_morning_analysis()
@@ -1620,11 +1541,66 @@ def main():
             <h1 style="background: linear-gradient(90deg, #00ff87, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; margin-bottom: 0.5rem;">
                 📊 Advanced Performance Analytics
             </h1>
-            <p style="color: #8b949e; font-size: 1.1rem;">Deep Dive into Your Trading Performance</p>
+            <p style="color: #8b949e; font-size: 1.1rem;">Deep Dive into Your Trading Performance with Real Market Data</p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.info("🚀 Advanced analytics will be displayed here once you start trading!")
+        account = EnhancedMockTradingAccount()
+        balance = account.get_current_balance_with_real_data()
+        
+        if balance['closed_trades_count'] == 0:
+            st.info("📈 **Start trading to see performance analytics here!** Visit the Morning Analysis page to find real market opportunities.")
+        else:
+            # Performance analytics with real data
+            st.markdown("### 📈 Portfolio Performance Metrics")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Return", f"{balance['total_return_pct']:+.1f}%")
+            with col2:
+                st.metric("Total Trades", balance['closed_trades_count'])
+            with col3:
+                st.metric("Win Rate", f"{balance['win_rate']:.1f}%")
+            with col4:
+                st.metric("Net P&L", f"${balance['realized_pnl']:,.0f}")
+            
+            # Strategy performance breakdown
+            if st.session_state.closed_trades:
+                st.markdown("### 🎯 Strategy Performance Analysis")
+                
+                df = pd.DataFrame(st.session_state.closed_trades)
+                
+                # Performance by strategy type
+                strategy_stats = df.groupby('setup_type').agg({
+                    'realized_pnl_pct': ['count', 'mean', lambda x: (x > 0).mean() * 100],
+                    'days_held': 'mean',
+                    'realized_pnl': 'sum'
+                }).round(2)
+                
+                strategy_stats.columns = ['Count', 'Avg Return %', 'Win Rate %', 'Avg Days', 'Total P&L ]
+                
+                st.dataframe(strategy_stats, use_container_width=True)
+                
+                # Performance chart by strategy
+                fig = px.bar(
+                    df.groupby('setup_type')['realized_pnl_pct'].mean().reset_index(),
+                    x='setup_type', 
+                    y='realized_pnl_pct',
+                    title="Average Return by Strategy Type",
+                    color='realized_pnl_pct',
+                    color_continuous_scale="RdYlGn",
+                    labels={'setup_type': 'Strategy Type', 'realized_pnl_pct': 'Average Return %'}
+                )
+                
+                fig.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white')
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
     main()
