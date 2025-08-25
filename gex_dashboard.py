@@ -1,6 +1,6 @@
 """
 GEX Trading Dashboard - Professional Edition v10.2
-Fully robust error handling with comprehensive safety checks
+Complete version with comprehensive error handling
 """
 
 import streamlit as st
@@ -96,6 +96,26 @@ st.markdown("""
         font-weight: bold;
     }
     
+    .invalid-symbol {
+        color: #ff6b6b;
+        font-weight: bold;
+        text-decoration: line-through;
+    }
+    
+    .options-available {
+        background: rgba(0, 255, 135, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+        color: #00ff87;
+    }
+    
+    .no-options {
+        background: rgba(255, 107, 107, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+        color: #ff6b6b;
+    }
+    
     .setup-details {
         background: rgba(0, 255, 135, 0.1);
         border-left: 3px solid #00ff87;
@@ -104,6 +124,33 @@ st.markdown("""
         border-radius: 8px;
     }
     
+    .performance-card {
+        background: linear-gradient(135deg, rgba(58, 123, 213, 0.1) 0%, rgba(0, 210, 255, 0.1) 100%);
+        border: 1px solid rgba(0, 210, 255, 0.3);
+        border-radius: 12px;
+        padding: 20px;
+        margin: 10px 0;
+    }
+    
+    .filter-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 12px;
+        margin: 15px 0;
+    }
+    
+    /* Loading animation */
+    .loading-wave {
+        display: inline-block;
+        animation: wave 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes wave {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    /* Strategy colors */
     .squeeze-play { color: #ff6b6b; font-weight: bold; }
     .premium-sell { color: #ffd93d; font-weight: bold; }
     .iron-condor { color: #00ff87; font-weight: bold; }
@@ -188,7 +235,7 @@ class SymbolValidator:
     def initialize_database(self):
         """Initialize SQLite database for caching"""
         try:
-            self.conn = sqlite3.connect(':memory:', check_same_thread=False)  # Use in-memory DB for safety
+            self.conn = sqlite3.connect(':memory:', check_same_thread=False)
             self.cursor = self.conn.cursor()
             self.cursor.execute('''
                 CREATE TABLE symbol_cache (
@@ -443,7 +490,7 @@ class OptimizedGEXCalculator:
                 return False
             
             # Get the most recent close price
-            self.spot_price = safe_float(hist['Close'].iloc[-1], 100.0)  # Default to $100
+            self.spot_price = safe_float(hist['Close'].iloc[-1], 100.0)
             
             if self.spot_price <= 0:
                 logger.warning(f"Invalid price for {self.symbol}: {self.spot_price}")
@@ -540,7 +587,7 @@ class OptimizedGEXCalculator:
         except Exception as e:
             logger.error(f"Critical error calculating GEX for {self.symbol}: {e}")
             self._generate_simulated_gex()
-            return True  # Always return True to continue processing
+            return True
     
     def _calculate_gamma_safe(self, strike: float, iv: float, days_to_exp: int) -> float:
         """Safely calculate gamma with bounds checking"""
@@ -551,7 +598,7 @@ class OptimizedGEXCalculator:
             # Simplified gamma calculation
             moneyness = safe_divide(self.spot_price, strike, 1.0)
             time_factor = max(days_to_exp / 365.0, 0.001)
-            iv_safe = max(min(iv, 2.0), 0.05)  # Bound IV between 5% and 200%
+            iv_safe = max(min(iv, 2.0), 0.05)
             
             # Black-Scholes approximation
             d1 = (np.log(moneyness) + (0.02 + iv_safe**2/2) * time_factor) / (iv_safe * np.sqrt(time_factor))
@@ -561,7 +608,7 @@ class OptimizedGEXCalculator:
             return max(0.001, min(gamma, 10.0))
             
         except Exception:
-            return 0.01  # Safe default
+            return 0.01
     
     def _find_walls(self, wall_data: dict, above_spot: bool) -> List[float]:
         """Find gamma walls above or below spot price"""
@@ -598,7 +645,7 @@ class OptimizedGEXCalculator:
             else:
                 self.gamma_flip = self.spot_price
             
-            # Ensure flip is reasonable (within 10% of spot)
+            # Ensure flip is reasonable
             max_flip = self.spot_price * 1.10
             min_flip = self.spot_price * 0.90
             self.gamma_flip = max(min_flip, min(max_flip, self.gamma_flip))
@@ -610,7 +657,7 @@ class OptimizedGEXCalculator:
         """Generate realistic simulated GEX for testing"""
         try:
             if self.spot_price <= 0:
-                self.spot_price = 100.0  # Default price
+                self.spot_price = 100.0
             
             # Generate realistic GEX based on symbol
             if self.symbol in ['SPY', 'QQQ']:
@@ -670,12 +717,12 @@ class OptimizedGEXCalculator:
                 if setup:
                     setups.append(setup)
             
-            if self.net_gex > 1e9 and self.call_walls and self.put_walls:  # Condor conditions
+            if self.net_gex > 1e9 and self.call_walls and self.put_walls:
                 setup = self._create_condor_setup_safe(distance_to_flip)
                 if setup:
                     setups.append(setup)
             
-            if abs(distance_to_flip) < 1.0:  # Near gamma flip
+            if abs(distance_to_flip) < 1.0:
                 setup = self._create_flip_setup_safe(distance_to_flip)
                 if setup:
                     setups.append(setup)
@@ -694,12 +741,10 @@ class OptimizedGEXCalculator:
             atm_call = round(self.spot_price / 5.0) * 5.0
             stop_loss = self.put_walls[0] if self.put_walls else self.spot_price * 0.98
             
-            # Safe calculations
             target_price = max(self.gamma_flip, self.spot_price * 1.01)
             max_profit = max(0.0, (target_price - atm_call) * 100.0)
-            max_loss = max(50.0, self.spot_price * 0.02 * 100.0)  # Minimum $50 loss
+            max_loss = max(50.0, self.spot_price * 0.02 * 100.0)
             
-            # Risk/reward with safety
             risk_reward = safe_divide(max_profit, max_loss, 1.0)
             breakeven = atm_call + safe_divide(max_loss, 100.0, self.spot_price * 0.02)
             
@@ -739,7 +784,7 @@ class OptimizedGEXCalculator:
             short_strike = self.call_walls[0] if self.call_walls else self.spot_price * 1.02
             stop_loss = short_strike * 1.02
             
-            max_profit = self.spot_price * 0.01 * 100.0  # 1% profit
+            max_profit = self.spot_price * 0.01 * 100.0
             max_loss = (stop_loss - short_strike) * 100.0
             
             return DetailedTradeSetup(
@@ -781,7 +826,7 @@ class OptimizedGEXCalculator:
             put_wall = self.put_walls[0]
             spread_pct = safe_percentage(call_wall, put_wall, 0.0)
             
-            if abs(spread_pct) < 3.0:  # Need at least 3% spread
+            if abs(spread_pct) < 3.0:
                 return None
             
             confidence = max(60.0, min(85.0, 60.0 + abs(spread_pct) * 2.0))
@@ -824,12 +869,10 @@ class OptimizedGEXCalculator:
             confidence = max(60.0, min(90.0, 75.0 + (1.0 - abs(distance_to_flip)) * 15.0))
             
             if self.spot_price < self.gamma_flip:
-                # Bullish setup
                 stop_loss = self.spot_price * 0.98
                 strategy_type = "CALL"
                 target = self.gamma_flip * 1.02
             else:
-                # Bearish setup  
                 stop_loss = self.spot_price * 1.02
                 strategy_type = "PUT"
                 target = self.gamma_flip * 0.98
@@ -866,6 +909,63 @@ class OptimizedGEXCalculator:
         except Exception as e:
             logger.error(f"Error creating flip setup for {self.symbol}: {e}")
             return None
+
+# ======================== ENHANCED AUTO TRADER ========================
+
+class EnhancedAutoTrader:
+    """Enhanced auto trader with risk management"""
+    
+    def __init__(self):
+        self.initialize_state()
+        self.risk_manager = RiskManager()
+        
+    def initialize_state(self):
+        """Initialize trading state"""
+        if 'auto_positions' not in st.session_state:
+            st.session_state.auto_positions = []
+        
+        if 'auto_trade_history' not in st.session_state:
+            st.session_state.auto_trade_history = []
+        
+        if 'auto_trading_enabled' not in st.session_state:
+            st.session_state.auto_trading_enabled = False
+        
+        if 'auto_trade_capital' not in st.session_state:
+            st.session_state.auto_trade_capital = 100000
+        
+        if 'auto_trade_pnl' not in st.session_state:
+            st.session_state.auto_trade_pnl = 0
+        
+        if 'max_positions' not in st.session_state:
+            st.session_state.max_positions = 10
+        
+        if 'max_risk_per_trade' not in st.session_state:
+            st.session_state.max_risk_per_trade = 0.02
+
+class RiskManager:
+    """Risk management system"""
+    
+    def calculate_position_size(self, setup: DetailedTradeSetup, capital: float) -> float:
+        """Calculate optimal position size using Kelly Criterion"""
+        try:
+            win_prob = setup.probability_profit
+            win_amount = setup.max_profit
+            loss_amount = abs(setup.max_loss)
+            
+            if loss_amount == 0:
+                return 0
+            
+            # Kelly fraction
+            kelly = (win_prob * win_amount - (1 - win_prob) * loss_amount) / win_amount
+            kelly = max(0, min(kelly, 0.25))
+            
+            position_size = kelly * capital
+            position_size = min(position_size, capital * 0.05)
+            position_size = min(position_size, setup.position_size)
+            
+            return position_size
+        except:
+            return capital * 0.02
 
 # ======================== PARALLEL PROCESSOR ========================
 
@@ -914,7 +1014,7 @@ def process_universe_parallel(symbols: List[str]) -> Tuple[Dict, List[DetailedTr
                               for symbol in symbols}
             
             completed = 0
-            for future in concurrent.futures.as_completed(future_to_symbol, timeout=300):  # 5 minute timeout
+            for future in concurrent.futures.as_completed(future_to_symbol, timeout=300):
                 symbol = future_to_symbol[future]
                 completed += 1
                 
@@ -924,7 +1024,7 @@ def process_universe_parallel(symbols: List[str]) -> Tuple[Dict, List[DetailedTr
                     progress_bar.progress(completed / len(symbols))
                 
                 try:
-                    data, setups = future.result(timeout=30)  # 30 second per symbol timeout
+                    data, setups = future.result(timeout=30)
                     if data:
                         all_data[symbol] = data
                         all_setups.extend(setups)
@@ -1153,6 +1253,48 @@ def render_universe_analysis():
             total_setups = len(st.session_state.get('all_setups_detailed', []))
             st.metric("Total Setups", total_setups)
         
+        # GEX Distribution Chart
+        st.markdown("---")
+        st.markdown("### GEX Distribution")
+        
+        gex_data = []
+        for k, v in all_data.items():
+            gex_data.append({
+                'Symbol': k,
+                'Net GEX (B)': safe_float(v.get('net_gex', 0)) / 1e9,
+                'Distance to Flip': safe_float(v.get('distance_to_flip', 0))
+            })
+        
+        if gex_data:
+            gex_df = pd.DataFrame(gex_data)
+            
+            fig = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=("Net GEX Distribution", "Distance to Gamma Flip")
+            )
+            
+            # GEX histogram
+            fig.add_trace(
+                go.Histogram(x=gex_df['Net GEX (B)'], nbinsx=30, name="GEX Distribution"),
+                row=1, col=1
+            )
+            
+            # Distance to flip histogram
+            fig.add_trace(
+                go.Histogram(x=gex_df['Distance to Flip'], nbinsx=30, name="Distance Distribution"),
+                row=1, col=2
+            )
+            
+            fig.update_layout(
+                height=400,
+                showlegend=False,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='white')
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        
         # Create detailed table
         st.markdown("---")
         st.markdown("### 📋 Symbol Details")
@@ -1245,7 +1387,7 @@ def render_trade_setups():
         
         except Exception as e:
             logger.error(f"Error filtering setups: {e}")
-            filtered_setups = all_setups[:20]  # Fallback to first 20
+            filtered_setups = all_setups[:20]
         
         # Display setups
         st.markdown(f"### 🎯 Found {len(filtered_setups)} Qualifying Setups")
@@ -1318,244 +1460,4 @@ def render_auto_trader():
                 st.metric("Capital", "$100,000", help="Available trading capital")
             with col2:
                 st.metric("P&L", "$0", help="Current profit/loss")
-            with col3:
-                st.metric("Open Positions", "0/10", help="Current/maximum positions")
-            with col4:
-                st.metric("Win Rate", "0.0%", help="Percentage of winning trades")
-            
-            st.info("💡 Enable auto trading in the sidebar to start automated execution of high-confidence setups.")
-            return
-        
-        # Active auto trading interface
-        st.success("🟢 Auto Trading is ACTIVE")
-        
-        # Metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Capital", f"${st.session_state.auto_trade_capital:,.0f}")
-        
-        with col2:
-            st.metric("P&L", f"${st.session_state.auto_trade_pnl:+,.0f}")
-        
-        with col3:
-            open_positions = len([p for p in st.session_state.auto_positions 
-                                if p.get('status') == 'OPEN'])
-            st.metric("Open Positions", f"{open_positions}/{st.session_state.max_positions}")
-        
-        with col4:
-            win_rate = 0.0
-            if st.session_state.auto_trade_history:
-                wins = sum(1 for t in st.session_state.auto_trade_history 
-                          if safe_float(t.get('pnl', 0)) > 0)
-                total = len(st.session_state.auto_trade_history)
-                win_rate = (wins / total * 100.0) if total > 0 else 0.0
-            st.metric("Win Rate", f"{win_rate:.1f}%")
-        
-        # Trading controls
-        st.markdown("---")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("⏸️ Pause Trading", use_container_width=True):
-                st.session_state.auto_trading_enabled = False
-                st.success("Auto trading paused")
-                st.rerun()
-        
-        with col2:
-            if st.button("🔄 Refresh Positions", use_container_width=True):
-                st.info("Positions refreshed")
-        
-        with col3:
-            if st.button("📊 Export Data", use_container_width=True):
-                st.success("Data export prepared")
-        
-        # Positions and history tables
-        tab1, tab2 = st.tabs(["📈 Open Positions", "📋 Trade History"])
-        
-        with tab1:
-            if st.session_state.auto_positions:
-                try:
-                    positions_df = pd.DataFrame(st.session_state.auto_positions)
-                    st.dataframe(positions_df, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error displaying positions: {e}")
-                    st.json(st.session_state.auto_positions[:5])  # Show first 5 as JSON fallback
-            else:
-                st.info("📭 No open positions currently")
-        
-        with tab2:
-            if st.session_state.auto_trade_history:
-                try:
-                    history_df = pd.DataFrame(st.session_state.auto_trade_history)
-                    st.dataframe(history_df, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Error displaying trade history: {e}")
-                    st.json(st.session_state.auto_trade_history[:5])  # Show first 5 as JSON fallback
-            else:
-                st.info("📝 No trade history available")
-    
-    except Exception as e:
-        st.error(f"Error rendering auto trader: {str(e)}")
-        logger.error(f"Auto trader rendering error: {e}")
-
-def render_performance_analytics():
-    """Render performance analytics"""
-    try:
-        st.markdown("## 📈 Performance Analytics")
-        
-        if not st.session_state.auto_trade_history:
-            st.info("📊 No trading history available yet. Performance metrics will appear here once auto trading begins generating trade data.")
-            
-            # Show sample analytics interface
-            st.markdown("### 📊 Sample Analytics Dashboard")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total Trades", "0", help="Total number of completed trades")
-            with col2:
-                st.metric("Win Rate", "0.0%", help="Percentage of profitable trades")
-            with col3:
-                st.metric("Avg Win", "$0.00", help="Average profit per winning trade")
-            with col4:
-                st.metric("Avg Loss", "$0.00", help="Average loss per losing trade")
-            
-            # Placeholder chart
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=[datetime.now() - timedelta(days=30), datetime.now()],
-                y=[0, 0],
-                mode='lines',
-                name='Cumulative P&L',
-                line=dict(color='#00D2FF', width=3)
-            ))
-            fig.update_layout(
-                title="Cumulative P&L (Sample)",
-                height=300,
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='white')
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            return
-        
-        # Active performance analytics
-        try:
-            trades_df = pd.DataFrame(st.session_state.auto_trade_history)
-            
-            # Calculate metrics safely
-            total_trades = len(trades_df)
-            winning_trades = len(trades_df[trades_df['pnl'] > 0]) if 'pnl' in trades_df.columns else 0
-            losing_trades = len(trades_df[trades_df['pnl'] < 0]) if 'pnl' in trades_df.columns else 0
-            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-            
-            # Display metrics
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("Total Trades", total_trades)
-            with col2:
-                st.metric("Win Rate", f"{win_rate:.1f}%")
-            with col3:
-                avg_win = trades_df[trades_df['pnl'] > 0]['pnl'].mean() if winning_trades > 0 else 0
-                st.metric("Avg Win", f"${avg_win:,.2f}")
-            with col4:
-                avg_loss = abs(trades_df[trades_df['pnl'] < 0]['pnl'].mean()) if losing_trades > 0 else 0
-                st.metric("Avg Loss", f"${avg_loss:,.2f}")
-            
-            # P&L Chart
-            if 'exit_time' in trades_df.columns and len(trades_df) > 0:
-                st.markdown("### Cumulative P&L")
-                
-                trades_df = trades_df.sort_values('exit_time')
-                trades_df['cumulative_pnl'] = trades_df['pnl'].cumsum()
-                
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=trades_df['exit_time'],
-                    y=trades_df['cumulative_pnl'],
-                    mode='lines+markers',
-                    name='Cumulative P&L',
-                    line=dict(color='#00D2FF', width=3)
-                ))
-                
-                fig.update_layout(
-                    height=400,
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color='white')
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-        
-        except Exception as e:
-            st.error(f"Error calculating performance metrics: {e}")
-    
-    except Exception as e:
-        st.error(f"Error rendering performance analytics: {str(e)}")
-        logger.error(f"Performance analytics rendering error: {e}")
-
-def render_strategy_guide():
-    """Render strategy guide"""
-    try:
-        st.markdown("## Strategy Guide")
-        
-        strategies = {
-            "Negative GEX Squeeze": {
-                "When": "Net GEX < -500M",
-                "Setup": "Price below gamma flip with put wall support",
-                "Entry": "Buy ATM calls 2-5 DTE",
-                "Exit": "Target gamma flip, stop at put wall",
-                "Risk": "Max 3% of capital"
-            },
-            "Premium Selling": {
-                "When": "Net GEX > 2B",
-                "Setup": "High positive GEX with strong walls",
-                "Entry": "Sell OTM options at walls",
-                "Exit": "50% profit or expiration",
-                "Risk": "Max 5% of capital"
-            },
-            "Iron Condor": {
-                "When": "Net GEX > 1B, walls > 3% apart",
-                "Setup": "Range-bound with clear walls",
-                "Entry": "Sell at walls, protect beyond",
-                "Exit": "25% profit or 21 DTE",
-                "Risk": "Size for 2% max loss"
-            },
-            "Gamma Flip Play": {
-                "When": "Price within 1% of flip",
-                "Setup": "Regime change imminent",
-                "Entry": "Directional based on position",
-                "Exit": "2% beyond flip point",
-                "Risk": "Max 2% of capital"
-            }
-        }
-        
-        for name, details in strategies.items():
-            with st.expander(name):
-                for key, value in details.items():
-                    st.write(f"**{key}:** {value}")
-        
-        # Additional educational content
-        st.markdown("---")
-        st.markdown("### Key Concepts")
-        
-        concepts = {
-            "Gamma Exposure (GEX)": "The total dollar gamma that market makers must hedge. Calculated as: Spot × Gamma × Open Interest × 100",
-            "Gamma Flip": "The price level where net gamma changes from positive to negative (or vice versa)",
-            "Call Walls": "Strike prices with high call gamma that act as resistance levels",
-            "Put Walls": "Strike prices with high put gamma that act as support levels",
-            "Dealer Hedging": "Market makers buy/sell underlying stock to remain delta neutral"
-        }
-        
-        for concept, explanation in concepts.items():
-            with st.expander(f"What is {concept}?"):
-                st.write(explanation)
-    
-    except Exception as e:
-        st.error(f"Error rendering strategy guide: {str(e)}")
-        logger.error(f"Strategy guide rendering error: {e}")
-
-if __name__ == "__main__":
-    main()
+            with col
