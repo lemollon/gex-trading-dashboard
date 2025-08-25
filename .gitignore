@@ -69,3 +69,10 @@ logs/
 echo ".streamlit/" >> .gitignore
 echo "secrets.toml" >> .gitignore
 echo "*.toml" >> .gitignore
+
+# In your repository root, create/edit .gitignore
+echo ".streamlit/" >> .gitignore
+echo "secrets.toml" >> .gitignore
+echo "*.toml" >> .gitignore
+echo "__pycache__/" >> .gitignore
+echo ".env" >> .gitignore
