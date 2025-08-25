@@ -66,3 +66,6 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+echo ".streamlit/" >> .gitignore
+echo "secrets.toml" >> .gitignore
+echo "*.toml" >> .gitignore
