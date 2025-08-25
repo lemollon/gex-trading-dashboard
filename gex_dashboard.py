@@ -389,7 +389,7 @@ if 'portfolio' not in st.session_state:
         'cash': 100000,
         'total_value': 100000,
         'daily_pnl': 0,
-        'trade_history': []
+        'trade_history': []  # Make sure this exists
     }
 
 if 'all_gex_data' not in st.session_state:
@@ -406,6 +406,10 @@ if 'alerts' not in st.session_state:
 
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = ["SPY", "QQQ", "IWM", "DIA"]
+
+# Fix existing portfolio if it's missing trade_history
+if 'trade_history' not in st.session_state.portfolio:
+    st.session_state.portfolio['trade_history'] = []
 
 # ======================== SECURE PRODUCTION CONNECTION ========================
 
@@ -1338,13 +1342,26 @@ sql_endpoint_id = "your-warehouse-id"
                                 new_position = {
                                     'symbol': setup['symbol'],
                                     'type': setup['type'],
+                                    'strategy': setup['strategy'],
                                     'entry_price': setup['entry_price'],
                                     'quantity': 1,
+                                    'value': setup['entry_price'] * 100,  # Options value
                                     'timestamp': datetime.now(),
                                     'status': 'OPEN'
                                 }
                                 st.session_state.portfolio['positions'].append(new_position)
-                                st.success(f"Trade executed for {setup['symbol']}")
+                                
+                                # Add to trade history
+                                trade_record = {
+                                    'symbol': setup['symbol'],
+                                    'strategy': setup['strategy'],
+                                    'entry_price': setup['entry_price'],
+                                    'timestamp': datetime.now(),
+                                    'pnl': 0  # Will be updated when closed
+                                }
+                                st.session_state.portfolio['trade_history'].append(trade_record)
+                                
+                                st.success(f"✅ Trade executed: {setup['symbol']} {setup['strategy']}")
                                 st.balloons()
             else:
                 st.info(f"No setups found with confidence >= {confidence_threshold}%. Try lowering the threshold.")
@@ -1606,7 +1623,16 @@ sql_endpoint_id = "your-warehouse-id"
             st.metric("Open Positions", len(st.session_state.portfolio['positions']))
         
         with col2:
-            total_exposure = sum([p.get('value', 1000) for p in st.session_state.portfolio['positions']])
+            # Safely calculate total exposure
+            total_exposure = 0
+            for p in st.session_state.portfolio['positions']:
+                if 'value' in p:
+                    total_exposure += p['value']
+                elif 'entry_price' in p and 'quantity' in p:
+                    total_exposure += p['entry_price'] * p['quantity'] * 100  # Options multiplier
+                else:
+                    total_exposure += 1000  # Default position value
+            
             st.metric("Total Exposure", f"${total_exposure:,.0f}")
         
         with col3:
@@ -1649,9 +1675,20 @@ sql_endpoint_id = "your-warehouse-id"
             if st.button("🎲 Random Market Move", use_container_width=True):
                 # Simulate market movement
                 market_move = np.random.uniform(-0.05, 0.05)  # +/- 5%
-                pnl_change = market_move * total_exposure
+                pnl_change = market_move * total_exposure if total_exposure > 0 else np.random.uniform(-500, 1000)
+                
                 st.session_state.portfolio['daily_pnl'] += pnl_change
                 st.session_state.portfolio['total_value'] += pnl_change
+                
+                # Add a sample trade to history for demo
+                sample_trade = {
+                    'symbol': np.random.choice(['SPY', 'QQQ', 'AAPL', 'TSLA']),
+                    'strategy': np.random.choice(['Long Call', 'Short Put', 'Iron Condor']),
+                    'entry_price': np.random.uniform(300, 500),
+                    'pnl': pnl_change,
+                    'timestamp': datetime.now()
+                }
+                st.session_state.portfolio['trade_history'].append(sample_trade)
                 
                 if market_move > 0:
                     st.success(f"📈 Market up {market_move*100:.2f}%! P&L: +${pnl_change:,.0f}")
@@ -1778,8 +1815,10 @@ sql_endpoint_id = "your-warehouse-id"
         st.markdown("## 📉 Performance Analytics")
         
         # Performance metrics
-        if st.session_state.portfolio['trade_history']:
-            trades_df = pd.DataFrame(st.session_state.portfolio['trade_history'])
+        trade_history = st.session_state.portfolio.get('trade_history', [])
+        
+        if trade_history and len(trade_history) > 0:
+            trades_df = pd.DataFrame(trade_history)
             
             # Calculate metrics
             total_trades = len(trades_df)
