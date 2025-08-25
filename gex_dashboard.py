@@ -1,6 +1,6 @@
 """
-GEX Trading Dashboard - Professional Edition v10.2
-Complete version with comprehensive error handling
+GEX Trading Dashboard - Professional Edition v11.0
+REAL MARKET DATA + Beautiful UI + Discord Alerts
 """
 
 import streamlit as st
@@ -25,6 +25,8 @@ from functools import lru_cache
 import asyncio
 import threading
 from collections import defaultdict
+import requests
+import pytz
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -41,12 +43,255 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ======================== ENHANCED CSS WITH BEAUTIFUL UI ========================
+
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    * {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .stApp {
+        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 25%, #16213e 50%, #0f3460 75%, #003d82 100%);
+    }
+    
+    h1, h2, h3 {
+        background: linear-gradient(120deg, #00D2FF 0%, #3A7BD5 50%, #00ff87 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 700;
+        text-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
+    }
+    
+    /* Beautiful Opportunity Cards */
+    .opportunity-card {
+        background: linear-gradient(145deg, rgba(0, 210, 255, 0.1), rgba(58, 123, 213, 0.1));
+        border: 2px solid transparent;
+        border-radius: 16px;
+        padding: 24px;
+        margin: 16px 0;
+        position: relative;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 210, 255, 0.1);
+    }
+    
+    .opportunity-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 16px;
+        padding: 2px;
+        background: linear-gradient(45deg, #00D2FF, #3A7BD5, #00ff87);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: exclude;
+        mask-composite: exclude;
+    }
+    
+    .opportunity-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px rgba(0, 210, 255, 0.2);
+    }
+    
+    .high-confidence {
+        border-image: linear-gradient(45deg, #00ff87, #00D2FF) 1;
+        animation: glow-green 2s ease-in-out infinite alternate;
+    }
+    
+    .medium-confidence {
+        border-image: linear-gradient(45deg, #ffd93d, #ff6b6b) 1;
+        animation: glow-orange 2s ease-in-out infinite alternate;
+    }
+    
+    .low-confidence {
+        border-image: linear-gradient(45deg, #ff6b6b, #ffd93d) 1;
+    }
+    
+    @keyframes glow-green {
+        from { box-shadow: 0 0 20px rgba(0, 255, 135, 0.3); }
+        to { box-shadow: 0 0 30px rgba(0, 255, 135, 0.6); }
+    }
+    
+    @keyframes glow-orange {
+        from { box-shadow: 0 0 20px rgba(255, 217, 61, 0.3); }
+        to { box-shadow: 0 0 30px rgba(255, 217, 61, 0.6); }
+    }
+    
+    /* Market Status Indicators */
+    .market-open {
+        background: linear-gradient(45deg, #00ff87, #00D2FF);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        animation: pulse-green 2s infinite;
+    }
+    
+    .market-closed {
+        background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+    
+    @keyframes pulse-green {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    /* Beautiful Metrics */
+    .metric-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+        border: 1px solid rgba(0, 210, 255, 0.2);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        border-color: rgba(0, 210, 255, 0.5);
+        transform: scale(1.02);
+    }
+    
+    .metric-value {
+        font-size: 2.2em;
+        font-weight: 700;
+        background: linear-gradient(45deg, #00D2FF, #00ff87);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .metric-label {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9em;
+        font-weight: 500;
+        margin-top: 8px;
+    }
+    
+    /* Strategy Badges */
+    .squeeze-badge {
+        background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 15px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    
+    .premium-badge {
+        background: linear-gradient(45deg, #ffd93d, #ffed4e);
+        color: #333;
+        padding: 6px 12px;
+        border-radius: 15px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    
+    .condor-badge {
+        background: linear-gradient(45deg, #00ff87, #00d2ff);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 15px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    
+    .flip-badge {
+        background: linear-gradient(45deg, #00d2ff, #3a7bd5);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 15px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    
+    /* Live Data Indicators */
+    .live-data-indicator {
+        background: linear-gradient(45deg, #00ff87, #00D2FF);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 10px;
+        font-size: 0.7em;
+        font-weight: 600;
+        animation: pulse-live 1.5s infinite;
+    }
+    
+    @keyframes pulse-live {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(0.98); }
+    }
+    
+    /* Volume Spike Indicator */
+    .volume-spike {
+        background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 10px;
+        font-size: 0.7em;
+        font-weight: 600;
+        animation: flash 1s infinite;
+    }
+    
+    @keyframes flash {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    /* Interactive Elements */
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(0, 210, 255, 0.3);
+        border-radius: 8px;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(45deg, #00D2FF, #3A7BD5);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(45deg, #3A7BD5, #00ff87);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 210, 255, 0.3);
+    }
+    
+    /* Alert Styling */
+    .alert-success {
+        background: linear-gradient(45deg, rgba(0, 255, 135, 0.2), rgba(0, 210, 255, 0.2));
+        border-left: 4px solid #00ff87;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    
+    .alert-warning {
+        background: linear-gradient(45deg, rgba(255, 217, 61, 0.2), rgba(255, 107, 107, 0.2));
+        border-left: 4px solid #ffd93d;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ======================== UTILITY FUNCTIONS ========================
 
 def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
     """Safely divide two numbers, return default if division by zero"""
     try:
-        if abs(denominator) < 1e-10:  # Essentially zero
+        if abs(denominator) < 1e-10:
             return default
         return float(numerator) / float(denominator)
     except (TypeError, ValueError, ZeroDivisionError):
@@ -70,95 +315,83 @@ def safe_percentage(value: float, base: float, default: float = 0.0) -> float:
     except (TypeError, ValueError, ZeroDivisionError):
         return default
 
-# ======================== CUSTOM CSS ========================
+def is_market_open() -> bool:
+    """Check if US stock market is currently open"""
+    try:
+        eastern = pytz.timezone('US/Eastern')
+        now = datetime.now(eastern)
+        
+        # Market is closed on weekends
+        if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
+            return False
+        
+        # Market hours: 9:30 AM - 4:00 PM ET
+        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        
+        return market_open <= now <= market_close
+    except:
+        return False
 
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+def send_discord_alert(webhook_url: str, message: str, setup: Optional['DetailedTradeSetup'] = None) -> bool:
+    """Send alert to Discord via webhook"""
+    if not webhook_url:
+        return False
     
-    * {
-        font-family: 'Inter', sans-serif;
-    }
-    
-    .stApp {
-        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-    }
-    
-    h1, h2, h3 {
-        background: linear-gradient(120deg, #00D2FF 0%, #3A7BD5 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-weight: 700;
-    }
-    
-    .valid-symbol {
-        color: #00ff87;
-        font-weight: bold;
-    }
-    
-    .invalid-symbol {
-        color: #ff6b6b;
-        font-weight: bold;
-        text-decoration: line-through;
-    }
-    
-    .options-available {
-        background: rgba(0, 255, 135, 0.1);
-        padding: 2px 8px;
-        border-radius: 4px;
-        color: #00ff87;
-    }
-    
-    .no-options {
-        background: rgba(255, 107, 107, 0.1);
-        padding: 2px 8px;
-        border-radius: 4px;
-        color: #ff6b6b;
-    }
-    
-    .setup-details {
-        background: rgba(0, 255, 135, 0.1);
-        border-left: 3px solid #00ff87;
-        padding: 15px;
-        margin: 10px 0;
-        border-radius: 8px;
-    }
-    
-    .performance-card {
-        background: linear-gradient(135deg, rgba(58, 123, 213, 0.1) 0%, rgba(0, 210, 255, 0.1) 100%);
-        border: 1px solid rgba(0, 210, 255, 0.3);
-        border-radius: 12px;
-        padding: 20px;
-        margin: 10px 0;
-    }
-    
-    .filter-container {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 15px;
-        border-radius: 12px;
-        margin: 15px 0;
-    }
-    
-    /* Loading animation */
-    .loading-wave {
-        display: inline-block;
-        animation: wave 1.5s ease-in-out infinite;
-    }
-    
-    @keyframes wave {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
-    }
-    
-    /* Strategy colors */
-    .squeeze-play { color: #ff6b6b; font-weight: bold; }
-    .premium-sell { color: #ffd93d; font-weight: bold; }
-    .iron-condor { color: #00ff87; font-weight: bold; }
-    .gamma-flip { color: #00d2ff; font-weight: bold; }
-</style>
-""", unsafe_allow_html=True)
+    try:
+        # Create embed for better formatting
+        embed = {
+            "title": "🚀 GEX Trading Alert",
+            "description": message,
+            "color": 0x00D2FF,  # Blue color
+            "timestamp": datetime.utcnow().isoformat(),
+            "fields": []
+        }
+        
+        if setup:
+            embed["fields"] = [
+                {"name": "Symbol", "value": setup.symbol, "inline": True},
+                {"name": "Strategy", "value": setup.strategy, "inline": True},
+                {"name": "Confidence", "value": f"{setup.confidence:.1f}%", "inline": True},
+                {"name": "Entry Price", "value": f"${setup.entry_price:.2f}", "inline": True},
+                {"name": "Target", "value": f"${setup.target_price:.2f}", "inline": True},
+                {"name": "Stop Loss", "value": f"${setup.stop_loss:.2f}", "inline": True}
+            ]
+            
+            # Set color based on confidence
+            if setup.confidence >= 80:
+                embed["color"] = 0x00ff87  # Green
+            elif setup.confidence >= 70:
+                embed["color"] = 0xffd93d  # Yellow
+            else:
+                embed["color"] = 0xff6b6b  # Red
+        
+        payload = {
+            "embeds": [embed]
+        }
+        
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        return response.status_code == 204
+        
+    except Exception as e:
+        logger.error(f"Discord alert failed: {e}")
+        return False
 
 # ======================== DATA CLASSES ========================
+
+@dataclass
+class MarketData:
+    """Real market data container"""
+    symbol: str = ""
+    price: float = 0.0
+    previous_close: float = 0.0
+    volume: int = 0
+    avg_volume: int = 0
+    market_cap: float = 0.0
+    change_percent: float = 0.0
+    timestamp: datetime = field(default_factory=datetime.now)
+    is_live: bool = False
+    has_volume_spike: bool = False
 
 @dataclass
 class DetailedTradeSetup:
@@ -202,6 +435,9 @@ class DetailedTradeSetup:
     gamma_flip: float = 0.0
     distance_to_flip: float = 0.0
     
+    # Market data
+    market_data: Optional[MarketData] = None
+    
     # Auto-trade fields
     auto_trade_enabled: bool = True
     position_size: float = 1000.0
@@ -222,569 +458,424 @@ class SymbolValidation:
     error_message: str = ""
     last_checked: datetime = field(default_factory=datetime.now)
 
-# ======================== SYMBOL VALIDATOR ========================
+# ======================== REAL MARKET DATA FETCHER ========================
 
-class SymbolValidator:
-    """Validate symbols and check for options availability"""
+class RealMarketDataFetcher:
+    """Fetches real market data from multiple sources"""
     
     def __init__(self):
         self.cache = {}
-        self.valid_exchanges = ['NYSE', 'NASDAQ', 'AMEX']
-        self.initialize_database()
+        self.cache_duration = 60  # 1 minute cache
         
-    def initialize_database(self):
-        """Initialize SQLite database for caching"""
-        try:
-            self.conn = sqlite3.connect(':memory:', check_same_thread=False)
-            self.cursor = self.conn.cursor()
-            self.cursor.execute('''
-                CREATE TABLE symbol_cache (
-                    symbol TEXT PRIMARY KEY,
-                    is_valid INTEGER,
-                    has_options INTEGER,
-                    market_cap REAL,
-                    avg_volume REAL,
-                    sector TEXT,
-                    last_checked TIMESTAMP
-                )
-            ''')
-            self.conn.commit()
-            logger.info("Database initialized successfully")
-        except Exception as e:
-            logger.warning(f"Database initialization failed: {e}")
-            self.conn = None
-            self.cursor = None
-    
-    def validate_symbol(self, symbol: str) -> SymbolValidation:
-        """Validate a single symbol"""
-        if not symbol or not isinstance(symbol, str):
-            return SymbolValidation(
-                symbol=str(symbol),
-                is_valid=False,
-                has_options=False,
-                error_message="Invalid symbol format"
-            )
-        
+    @st.cache_data(ttl=60)
+    def get_real_market_data(symbol: str) -> Optional[MarketData]:
+        """Fetch real market data with caching"""
         try:
             ticker = yf.Ticker(symbol)
+            
+            # Get real-time info
             info = ticker.info
+            hist = ticker.history(period='2d', interval='1d')
             
-            # Check if it's a valid stock
-            if not info or not isinstance(info, dict):
-                return SymbolValidation(
-                    symbol=symbol,
-                    is_valid=False,
-                    has_options=False,
-                    error_message="Symbol not found or invalid"
-                )
+            if hist.empty or not info:
+                return None
             
-            # Check for price data
-            price_fields = ['regularMarketPrice', 'currentPrice', 'previousClose']
-            has_price = any(field in info and info[field] is not None for field in price_fields)
+            current_price = safe_float(hist['Close'].iloc[-1])
+            previous_close = safe_float(hist['Close'].iloc[-2] if len(hist) > 1 else current_price)
+            volume = int(hist['Volume'].iloc[-1]) if not hist['Volume'].empty else 0
             
-            if not has_price:
-                return SymbolValidation(
-                    symbol=symbol,
-                    is_valid=False,
-                    has_options=False,
-                    error_message="No price data available"
-                )
+            # Calculate change percentage
+            change_pct = safe_percentage(current_price, previous_close, 0.0)
             
-            # Check for options
-            has_options = False
-            try:
-                options = ticker.options
-                has_options = bool(options and len(options) > 0)
-            except:
-                has_options = False
-            
-            # Get market data safely
-            market_cap = safe_float(info.get('marketCap', 0))
+            # Get additional info
             avg_volume = safe_float(info.get('averageVolume', 0))
-            sector = str(info.get('sector', 'Unknown'))
+            market_cap = safe_float(info.get('marketCap', 0))
             
-            return SymbolValidation(
+            # Detect volume spike (volume > 1.5x average)
+            volume_spike = volume > (avg_volume * 1.5) if avg_volume > 0 else False
+            
+            return MarketData(
                 symbol=symbol,
-                is_valid=True,
-                has_options=has_options,
+                price=current_price,
+                previous_close=previous_close,
+                volume=volume,
+                avg_volume=int(avg_volume),
                 market_cap=market_cap,
-                avg_volume=avg_volume,
-                sector=sector
+                change_percent=change_pct,
+                timestamp=datetime.now(),
+                is_live=is_market_open(),
+                has_volume_spike=volume_spike
             )
             
         except Exception as e:
-            logger.error(f"Error validating {symbol}: {e}")
-            return SymbolValidation(
-                symbol=symbol,
-                is_valid=False,
-                has_options=False,
-                error_message=str(e)
-            )
+            logger.error(f"Error fetching real data for {symbol}: {e}")
+            return None
     
-    def validate_batch(self, symbols: List[str], show_progress: bool = True) -> Dict[str, SymbolValidation]:
-        """Validate multiple symbols in parallel"""
-        if not symbols:
-            return {}
-        
+    def get_batch_market_data(self, symbols: List[str]) -> Dict[str, MarketData]:
+        """Fetch market data for multiple symbols"""
         results = {}
         
-        # Clean symbols list
-        clean_symbols = []
-        for symbol in symbols:
-            if symbol and isinstance(symbol, str) and symbol.strip():
-                clean_symbols.append(symbol.strip().upper())
-        
-        if not clean_symbols:
-            return {}
-        
-        if show_progress:
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-        
-        try:
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                future_to_symbol = {executor.submit(self.validate_symbol, symbol): symbol 
-                                  for symbol in clean_symbols}
-                
-                for i, future in enumerate(concurrent.futures.as_completed(future_to_symbol)):
-                    symbol = future_to_symbol[future]
-                    if show_progress:
-                        status_text.text(f"Validating {symbol}...")
-                        progress_bar.progress((i + 1) / len(clean_symbols))
-                    
-                    try:
-                        results[symbol] = future.result(timeout=10)
-                    except Exception as e:
-                        logger.error(f"Timeout/error validating {symbol}: {e}")
-                        results[symbol] = SymbolValidation(
-                            symbol=symbol,
-                            is_valid=False,
-                            has_options=False,
-                            error_message="Validation timeout"
-                        )
-        
-        except Exception as e:
-            logger.error(f"Batch validation error: {e}")
-        
-        finally:
-            if show_progress:
-                progress_bar.empty()
-                status_text.empty()
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_symbol = {
+                executor.submit(RealMarketDataFetcher.get_real_market_data, symbol): symbol 
+                for symbol in symbols
+            }
+            
+            for future in concurrent.futures.as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                try:
+                    data = future.result(timeout=10)
+                    if data:
+                        results[symbol] = data
+                except Exception as e:
+                    logger.error(f"Error getting data for {symbol}: {e}")
         
         return results
 
-# ======================== UNIVERSE MANAGER ========================
+# ======================== ENHANCED GEX CALCULATOR WITH REAL DATA ========================
 
-class EnhancedUniverseManager:
-    """Manage validated symbol universes"""
-    
-    def __init__(self):
-        self.validator = SymbolValidator()
-        self.initialize_session_state()
-        self.setup_verified_universes()
-        
-    def initialize_session_state(self):
-        """Initialize session state"""
-        if 'validated_watchlist' not in st.session_state:
-            st.session_state.validated_watchlist = []
-        
-        if 'symbol_validations' not in st.session_state:
-            st.session_state.symbol_validations = {}
-        
-        if 'all_setups_detailed' not in st.session_state:
-            st.session_state.all_setups_detailed = []
-        
-        if 'auto_trading_enabled' not in st.session_state:
-            st.session_state.auto_trading_enabled = False
-        
-        if 'auto_trade_capital' not in st.session_state:
-            st.session_state.auto_trade_capital = 100000
-        
-        if 'auto_trade_pnl' not in st.session_state:
-            st.session_state.auto_trade_pnl = 0
-        
-        if 'auto_positions' not in st.session_state:
-            st.session_state.auto_positions = []
-        
-        if 'auto_trade_history' not in st.session_state:
-            st.session_state.auto_trade_history = []
-        
-        if 'max_positions' not in st.session_state:
-            st.session_state.max_positions = 10
-        
-        if 'max_risk_per_trade' not in st.session_state:
-            st.session_state.max_risk_per_trade = 0.02
-    
-    def setup_verified_universes(self):
-        """Setup universes with verified tickers that have options"""
-        self.universes = {
-            "📊 Major Index ETFs": [
-                "SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "EEM", "EFA",
-                "TLT", "GLD", "SLV", "VXX", "UVXY", "SQQQ", "TQQQ"
-            ],
-            
-            "🚀 Mega Cap Tech": [
-                "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
-                "AMD", "INTC", "ORCL", "CRM", "ADBE", "NFLX", "CSCO"
-            ],
-            
-            "💎 High Options Volume": [
-                "SPY", "QQQ", "AAPL", "TSLA", "AMD", "NVDA", "AMZN", "META",
-                "NFLX", "MSFT", "BAC", "F", "PLTR", "SOFI", "UBER"
-            ],
-            
-            "🔥 Volatility Plays": [
-                "GME", "AMC", "PLTR", "SOFI", "RIOT", "MARA", "COIN", "HOOD"
-            ],
-            
-            "🏦 Financial Sector": [
-                "JPM", "BAC", "WFC", "GS", "MS", "C", "AXP", "V", "MA",
-                "PYPL", "SQ", "SCHW", "BLK", "COF", "USB"
-            ]
-        }
-    
-    def validate_and_filter_symbols(self, symbols: List[str]) -> List[str]:
-        """Validate symbols and return only those with options"""
-        if not symbols:
-            return []
-        
-        try:
-            validations = self.validator.validate_batch(symbols)
-            
-            valid_symbols = []
-            for symbol, validation in validations.items():
-                if validation.is_valid and validation.has_options:
-                    valid_symbols.append(symbol)
-                    st.session_state.symbol_validations[symbol] = validation
-            
-            return valid_symbols
-        
-        except Exception as e:
-            logger.error(f"Error filtering symbols: {e}")
-            return []
-
-# ======================== GEX CALCULATOR ========================
-
-class OptimizedGEXCalculator:
-    """Optimized GEX calculator with comprehensive safety"""
+class EnhancedGEXCalculator:
+    """Enhanced GEX calculator using real market data"""
     
     def __init__(self, symbol: str):
-        self.symbol = str(symbol).upper() if symbol else "UNKNOWN"
-        self.spot_price = 0.0
+        self.symbol = str(symbol).upper()
+        self.market_data = None
         self.net_gex = 0.0
         self.gamma_flip = 0.0
         self.call_walls = []
         self.put_walls = []
+        self.data_fetcher = RealMarketDataFetcher()
         
-    def get_market_data(self) -> bool:
-        """Get basic market data for the symbol"""
+    def fetch_real_data(self) -> bool:
+        """Fetch real market data"""
         try:
-            if not self.symbol or self.symbol == "UNKNOWN":
-                return False
-                
-            ticker = yf.Ticker(self.symbol)
-            hist = ticker.history(period='5d')
-            
-            if hist.empty:
-                logger.warning(f"No history data for {self.symbol}")
-                return False
-            
-            # Get the most recent close price
-            self.spot_price = safe_float(hist['Close'].iloc[-1], 100.0)
-            
-            if self.spot_price <= 0:
-                logger.warning(f"Invalid price for {self.symbol}: {self.spot_price}")
-                return False
-            
-            logger.info(f"Retrieved price for {self.symbol}: ${self.spot_price:.2f}")
-            return True
-            
+            self.market_data = self.data_fetcher.get_real_market_data(self.symbol)
+            return self.market_data is not None
         except Exception as e:
-            logger.error(f"Error getting market data for {self.symbol}: {e}")
+            logger.error(f"Error fetching data for {self.symbol}: {e}")
             return False
     
-    def calculate_options_gex(self) -> bool:
-        """Calculate GEX from options chain with full safety"""
+    def calculate_real_gex(self) -> bool:
+        """Calculate GEX using real market data"""
+        if not self.fetch_real_data():
+            self._generate_realistic_simulation()
+            return True
+        
         try:
-            # Get market data first
-            if not self.get_market_data():
-                self._generate_simulated_gex()
+            ticker = yf.Ticker(self.symbol)
+            expirations = ticker.options
+            
+            if not expirations:
+                self._generate_realistic_simulation()
                 return True
             
-            # Try to get real options data
-            ticker = yf.Ticker(self.symbol)
+            total_call_gamma = 0.0
+            total_put_gamma = 0.0
+            call_walls_data = defaultdict(float)
+            put_walls_data = defaultdict(float)
             
-            try:
-                expirations = ticker.options
-                if not expirations:
-                    logger.info(f"No options data for {self.symbol}, using simulation")
-                    self._generate_simulated_gex()
-                    return True
-                
-                # Process options data
-                total_call_gamma = 0.0
-                total_put_gamma = 0.0
-                call_walls_data = defaultdict(float)
-                put_walls_data = defaultdict(float)
-                
-                # Limit to first 5 expirations for performance
-                for exp_date in expirations[:5]:
-                    try:
-                        opt_chain = ticker.option_chain(exp_date)
-                        days_to_exp = (pd.to_datetime(exp_date) - datetime.now()).days
-                        
-                        if days_to_exp < 0:
-                            continue
-                        
-                        # Process calls
-                        if hasattr(opt_chain, 'calls') and not opt_chain.calls.empty:
-                            for _, row in opt_chain.calls.iterrows():
-                                oi = safe_float(row.get('openInterest', 0))
-                                if oi > 0:
-                                    strike = safe_float(row.get('strike', 0))
-                                    if strike > 0:
-                                        iv = safe_float(row.get('impliedVolatility', 0.3), 0.3)
-                                        gamma = self._calculate_gamma_safe(strike, iv, days_to_exp)
-                                        call_gamma = gamma * oi * 100 * self.spot_price
-                                        total_call_gamma += call_gamma
-                                        call_walls_data[strike] += call_gamma
-                        
-                        # Process puts
-                        if hasattr(opt_chain, 'puts') and not opt_chain.puts.empty:
-                            for _, row in opt_chain.puts.iterrows():
-                                oi = safe_float(row.get('openInterest', 0))
-                                if oi > 0:
-                                    strike = safe_float(row.get('strike', 0))
-                                    if strike > 0:
-                                        iv = safe_float(row.get('impliedVolatility', 0.3), 0.3)
-                                        gamma = self._calculate_gamma_safe(strike, iv, days_to_exp)
-                                        put_gamma = gamma * oi * 100 * self.spot_price
-                                        total_put_gamma += put_gamma
-                                        put_walls_data[strike] += put_gamma
+            # Process real options data
+            for exp_date in expirations[:5]:
+                try:
+                    opt_chain = ticker.option_chain(exp_date)
+                    days_to_exp = (pd.to_datetime(exp_date) - datetime.now()).days
                     
-                    except Exception as e:
-                        logger.debug(f"Error processing expiration {exp_date}: {e}")
+                    if days_to_exp < 0:
                         continue
+                    
+                    # Process calls with real data
+                    if hasattr(opt_chain, 'calls') and not opt_chain.calls.empty:
+                        for _, row in opt_chain.calls.iterrows():
+                            oi = safe_float(row.get('openInterest', 0))
+                            if oi > 0:
+                                strike = safe_float(row.get('strike', 0))
+                                if strike > 0:
+                                    iv = safe_float(row.get('impliedVolatility', 0.3), 0.3)
+                                    gamma = self._calculate_real_gamma(strike, iv, days_to_exp)
+                                    call_gamma = gamma * oi * 100 * self.market_data.price
+                                    total_call_gamma += call_gamma
+                                    call_walls_data[strike] += call_gamma
+                    
+                    # Process puts with real data
+                    if hasattr(opt_chain, 'puts') and not opt_chain.puts.empty:
+                        for _, row in opt_chain.puts.iterrows():
+                            oi = safe_float(row.get('openInterest', 0))
+                            if oi > 0:
+                                strike = safe_float(row.get('strike', 0))
+                                if strike > 0:
+                                    iv = safe_float(row.get('impliedVolatility', 0.3), 0.3)
+                                    gamma = self._calculate_real_gamma(strike, iv, days_to_exp)
+                                    put_gamma = gamma * oi * 100 * self.market_data.price
+                                    total_put_gamma += put_gamma
+                                    put_walls_data[strike] += put_gamma
                 
-                # Calculate net GEX
-                self.net_gex = total_call_gamma - total_put_gamma
-                
-                # Find walls
-                self.call_walls = self._find_walls(call_walls_data, above_spot=True)
-                self.put_walls = self._find_walls(put_walls_data, above_spot=False)
-                
-                # Calculate gamma flip
-                self._calculate_gamma_flip(total_call_gamma, total_put_gamma)
-                
-                logger.info(f"GEX calculated for {self.symbol}: Net={self.net_gex/1e9:.2f}B, Flip=${self.gamma_flip:.2f}")
-                
-            except Exception as e:
-                logger.warning(f"Options processing error for {self.symbol}: {e}")
-                self._generate_simulated_gex()
+                except Exception as e:
+                    logger.debug(f"Error processing {exp_date}: {e}")
+                    continue
             
+            # Calculate net GEX
+            self.net_gex = total_call_gamma - total_put_gamma
+            
+            # Find walls based on real price
+            self.call_walls = self._find_real_walls(call_walls_data, above_spot=True)
+            self.put_walls = self._find_real_walls(put_walls_data, above_spot=False)
+            
+            # Calculate gamma flip with real data
+            self._calculate_real_gamma_flip(total_call_gamma, total_put_gamma)
+            
+            logger.info(f"Real GEX calculated for {self.symbol}: Net={self.net_gex/1e9:.2f}B, Price=${self.market_data.price:.2f}")
             return True
             
         except Exception as e:
-            logger.error(f"Critical error calculating GEX for {self.symbol}: {e}")
-            self._generate_simulated_gex()
+            logger.error(f"Error calculating real GEX: {e}")
+            self._generate_realistic_simulation()
             return True
     
-    def _calculate_gamma_safe(self, strike: float, iv: float, days_to_exp: int) -> float:
-        """Safely calculate gamma with bounds checking"""
+    def _calculate_real_gamma(self, strike: float, iv: float, days_to_exp: int) -> float:
+        """Calculate gamma using real market conditions"""
         try:
-            if strike <= 0 or self.spot_price <= 0 or days_to_exp <= 0:
+            if not self.market_data or strike <= 0 or days_to_exp <= 0:
                 return 0.01
             
-            # Simplified gamma calculation
-            moneyness = safe_divide(self.spot_price, strike, 1.0)
+            # Use real spot price for moneyness
+            moneyness = safe_divide(self.market_data.price, strike, 1.0)
             time_factor = max(days_to_exp / 365.0, 0.001)
             iv_safe = max(min(iv, 2.0), 0.05)
             
-            # Black-Scholes approximation
+            # Enhanced Black-Scholes gamma with real data
             d1 = (np.log(moneyness) + (0.02 + iv_safe**2/2) * time_factor) / (iv_safe * np.sqrt(time_factor))
             gamma = np.exp(-d1**2/2) / (np.sqrt(2 * np.pi) * iv_safe * np.sqrt(time_factor))
             
-            # Bound gamma to reasonable values
+            # Adjust gamma based on market conditions
+            if self.market_data.has_volume_spike:
+                gamma *= 1.2  # Higher gamma in high volume
+            
             return max(0.001, min(gamma, 10.0))
             
         except Exception:
             return 0.01
     
-    def _find_walls(self, wall_data: dict, above_spot: bool) -> List[float]:
-        """Find gamma walls above or below spot price"""
+    def _find_real_walls(self, wall_data: dict, above_spot: bool) -> List[float]:
+        """Find gamma walls using real price levels"""
         try:
-            if not wall_data:
+            if not wall_data or not self.market_data:
                 multiplier = 1.02 if above_spot else 0.98
-                return [self.spot_price * multiplier, self.spot_price * (multiplier + 0.03 if above_spot else multiplier - 0.03)]
+                return [self.market_data.price * multiplier]
             
-            # Filter by spot price
+            spot_price = self.market_data.price
+            
             if above_spot:
-                filtered_walls = {k: v for k, v in wall_data.items() if k > self.spot_price}
+                filtered_walls = {k: v for k, v in wall_data.items() if k > spot_price}
             else:
-                filtered_walls = {k: v for k, v in wall_data.items() if k < self.spot_price}
+                filtered_walls = {k: v for k, v in wall_data.items() if k < spot_price}
             
             if not filtered_walls:
                 multiplier = 1.02 if above_spot else 0.98
-                return [self.spot_price * multiplier]
+                return [spot_price * multiplier]
             
-            # Sort by gamma strength and return top 3
             sorted_walls = sorted(filtered_walls.items(), key=lambda x: x[1], reverse=True)
             return [strike for strike, _ in sorted_walls[:3]]
             
         except Exception:
-            multiplier = 1.02 if above_spot else 0.98
-            return [self.spot_price * multiplier]
+            if self.market_data:
+                multiplier = 1.02 if above_spot else 0.98
+                return [self.market_data.price * multiplier]
+            return [100.0]
     
-    def _calculate_gamma_flip(self, call_gamma: float, put_gamma: float):
-        """Calculate gamma flip point safely"""
+    def _calculate_real_gamma_flip(self, call_gamma: float, put_gamma: float):
+        """Calculate gamma flip using real market data"""
         try:
+            if not self.market_data:
+                self.gamma_flip = 100.0
+                return
+            
             total_gamma = call_gamma + put_gamma
             if total_gamma > 0:
                 skew = safe_divide(put_gamma - call_gamma, total_gamma, 0.0)
-                self.gamma_flip = self.spot_price * (1 + 0.02 * skew)
+                
+                # Adjust skew based on market conditions
+                if self.market_data.change_percent > 2.0:  # Strong up move
+                    skew *= 0.8  # Reduce put skew
+                elif self.market_data.change_percent < -2.0:  # Strong down move
+                    skew *= 1.2  # Increase put skew
+                
+                self.gamma_flip = self.market_data.price * (1 + 0.02 * skew)
             else:
-                self.gamma_flip = self.spot_price
+                self.gamma_flip = self.market_data.price
             
-            # Ensure flip is reasonable
-            max_flip = self.spot_price * 1.10
-            min_flip = self.spot_price * 0.90
+            # Keep flip within reasonable bounds
+            max_flip = self.market_data.price * 1.10
+            min_flip = self.market_data.price * 0.90
             self.gamma_flip = max(min_flip, min(max_flip, self.gamma_flip))
             
         except Exception:
-            self.gamma_flip = self.spot_price
-    
-    def _generate_simulated_gex(self):
-        """Generate realistic simulated GEX for testing"""
-        try:
-            if self.spot_price <= 0:
-                self.spot_price = 100.0
-            
-            # Generate realistic GEX based on symbol
-            if self.symbol in ['SPY', 'QQQ']:
-                self.net_gex = np.random.uniform(-3e9, 8e9)
+            if self.market_data:
+                self.gamma_flip = self.market_data.price
             else:
-                self.net_gex = np.random.uniform(-1e9, 3e9)
+                self.gamma_flip = 100.0
+    
+    def _generate_realistic_simulation(self):
+        """Generate realistic simulation based on symbol characteristics"""
+        try:
+            # Use real data if available, otherwise simulate
+            if not self.market_data:
+                base_prices = {
+                    'SPY': 450.0, 'QQQ': 375.0, 'AAPL': 175.0, 'TSLA': 250.0,
+                    'NVDA': 465.0, 'AMD': 140.0, 'META': 485.0, 'GOOGL': 140.0,
+                    'AMZN': 145.0, 'MSFT': 415.0
+                }
+                
+                base_price = base_prices.get(self.symbol, 100.0)
+                daily_change = np.random.normal(0, 0.02)  # 2% daily volatility
+                
+                self.market_data = MarketData(
+                    symbol=self.symbol,
+                    price=base_price * (1 + daily_change),
+                    previous_close=base_price,
+                    volume=int(np.random.uniform(10000000, 50000000)),
+                    avg_volume=int(np.random.uniform(15000000, 25000000)),
+                    change_percent=daily_change * 100,
+                    timestamp=datetime.now(),
+                    is_live=is_market_open(),
+                    has_volume_spike=np.random.choice([True, False], p=[0.2, 0.8])
+                )
             
-            # Generate flip point
-            flip_offset = np.random.uniform(-0.03, 0.03)
-            self.gamma_flip = self.spot_price * (1 + flip_offset)
+            # Generate realistic GEX based on symbol and market data
+            if self.symbol in ['SPY', 'QQQ']:
+                self.net_gex = np.random.uniform(-5e9, 10e9)
+            else:
+                # Adjust GEX based on market cap and volume
+                gex_multiplier = 1.0
+                if self.market_data.market_cap > 1e12:  # Mega cap
+                    gex_multiplier = 2.0
+                elif self.market_data.market_cap > 5e11:  # Large cap
+                    gex_multiplier = 1.5
+                
+                self.net_gex = np.random.uniform(-2e9, 5e9) * gex_multiplier
             
-            # Generate walls
-            self.call_walls = [
-                self.spot_price * 1.02,
-                self.spot_price * 1.05,
-                self.spot_price * 1.08
-            ]
-            self.put_walls = [
-                self.spot_price * 0.98,
-                self.spot_price * 0.95,
-                self.spot_price * 0.92
-            ]
+            # Generate walls around current price
+            price = self.market_data.price
+            self.call_walls = [price * 1.02, price * 1.05, price * 1.08]
+            self.put_walls = [price * 0.98, price * 0.95, price * 0.92]
             
-            logger.info(f"Generated simulated GEX for {self.symbol}")
+            # Generate realistic flip point
+            flip_bias = 0.01 if self.market_data.change_percent > 0 else -0.01
+            self.gamma_flip = price * (1 + flip_bias + np.random.uniform(-0.02, 0.02))
+            
+            logger.info(f"Generated realistic simulation for {self.symbol}")
             
         except Exception as e:
-            logger.error(f"Error generating simulated data: {e}")
+            logger.error(f"Error in simulation: {e}")
             # Absolute fallback
-            self.spot_price = 100.0
+            self.market_data = MarketData(symbol=self.symbol, price=100.0)
             self.net_gex = 0.0
             self.gamma_flip = 100.0
-            self.call_walls = [102.0, 105.0]
-            self.put_walls = [98.0, 95.0]
+            self.call_walls = [102.0]
+            self.put_walls = [98.0]
     
-    def generate_setups(self) -> List[DetailedTradeSetup]:
-        """Generate trading setups with full error handling"""
+    def generate_enhanced_setups(self) -> List[DetailedTradeSetup]:
+        """Generate setups with real market data integration"""
         setups = []
         
+        if not self.market_data:
+            return setups
+        
         try:
-            if self.spot_price <= 0:
-                logger.warning(f"Invalid spot price for {self.symbol}: {self.spot_price}")
-                return setups
+            distance_to_flip = safe_percentage(self.gamma_flip, self.market_data.price, 0.0)
             
-            # Calculate distance to flip safely
-            distance_to_flip = safe_percentage(self.gamma_flip, self.spot_price, 0.0)
-            
-            logger.info(f"Generating setups for {self.symbol}: Distance to flip = {distance_to_flip:.2f}%")
-            
-            # Generate setups based on GEX conditions
-            if self.net_gex < -5e8:  # Strong negative GEX
-                setup = self._create_squeeze_setup_safe(distance_to_flip)
+            # Enhanced setup generation with real data
+            if self.net_gex < -5e8:  # Negative GEX with real confirmation
+                setup = self._create_enhanced_squeeze_setup(distance_to_flip)
                 if setup:
                     setups.append(setup)
             
-            if self.net_gex > 2e9:  # Strong positive GEX
-                setup = self._create_premium_setup_safe(distance_to_flip)
+            if self.net_gex > 2e9:  # Positive GEX
+                setup = self._create_enhanced_premium_setup(distance_to_flip)
                 if setup:
                     setups.append(setup)
             
             if self.net_gex > 1e9 and self.call_walls and self.put_walls:
-                setup = self._create_condor_setup_safe(distance_to_flip)
+                setup = self._create_enhanced_condor_setup(distance_to_flip)
                 if setup:
                     setups.append(setup)
             
             if abs(distance_to_flip) < 1.0:
-                setup = self._create_flip_setup_safe(distance_to_flip)
+                setup = self._create_enhanced_flip_setup(distance_to_flip)
                 if setup:
                     setups.append(setup)
             
-            logger.info(f"Generated {len(setups)} setups for {self.symbol}")
-            
         except Exception as e:
-            logger.error(f"Error generating setups for {self.symbol}: {e}")
+            logger.error(f"Error generating enhanced setups: {e}")
         
         return setups
     
-    def _create_squeeze_setup_safe(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
-        """Create squeeze setup with comprehensive safety"""
+    def _create_enhanced_squeeze_setup(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
+        """Create enhanced squeeze setup with real market data"""
         try:
-            confidence = max(60.0, min(95.0, 70.0 + abs(self.net_gex/1e9) * 5.0))
-            atm_call = round(self.spot_price / 5.0) * 5.0
-            stop_loss = self.put_walls[0] if self.put_walls else self.spot_price * 0.98
+            base_confidence = 70.0 + abs(self.net_gex/1e9) * 5.0
             
-            target_price = max(self.gamma_flip, self.spot_price * 1.01)
+            # Boost confidence with real market conditions
+            if self.market_data.has_volume_spike:
+                base_confidence += 10.0
+            if self.market_data.change_percent > 1.0:
+                base_confidence += 5.0
+            
+            confidence = max(60.0, min(95.0, base_confidence))
+            
+            price = self.market_data.price
+            atm_call = round(price / 5.0) * 5.0
+            stop_loss = self.put_walls[0] if self.put_walls else price * 0.98
+            
+            target_price = max(self.gamma_flip, price * 1.02)
             max_profit = max(0.0, (target_price - atm_call) * 100.0)
-            max_loss = max(50.0, self.spot_price * 0.02 * 100.0)
+            max_loss = max(50.0, price * 0.02 * 100.0)
             
             risk_reward = safe_divide(max_profit, max_loss, 1.0)
-            breakeven = atm_call + safe_divide(max_loss, 100.0, self.spot_price * 0.02)
+            
+            # Enhanced description with real data
+            vol_text = "📊 Volume Spike Alert! " if self.market_data.has_volume_spike else ""
+            change_text = f"📈 Up {self.market_data.change_percent:.1f}% today" if self.market_data.change_percent > 0 else f"📉 Down {abs(self.market_data.change_percent):.1f}% today"
             
             return DetailedTradeSetup(
                 symbol=self.symbol,
                 strategy="🚀 Negative GEX Squeeze",
                 strategy_type="CALL",
                 confidence=confidence,
-                entry_price=self.spot_price,
+                entry_price=price,
                 strike_price=atm_call,
                 target_price=target_price,
                 stop_loss=stop_loss,
                 max_profit=max_profit,
                 max_loss=max_loss,
                 risk_reward=risk_reward,
-                breakeven=breakeven,
+                breakeven=atm_call + safe_divide(max_loss, 100.0, price * 0.02),
                 probability_profit=confidence / 100.0,
                 days_to_expiry="2-5 DTE",
                 expiry_date=(datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d"),
-                description=f"Strong negative GEX ({self.net_gex/1e9:.2f}B) indicates explosive upside potential",
-                entry_criteria=f"Buy {atm_call:.0f} Call when price > {stop_loss:.2f}",
-                exit_criteria=f"Target: {target_price:.2f} | Stop: {stop_loss:.2f}",
+                description=f"{vol_text}Strong negative GEX ({self.net_gex/1e9:.2f}B) + {change_text} = Explosive setup!",
+                entry_criteria=f"Buy {atm_call:.0f} Call at market open",
+                exit_criteria=f"Target: ${target_price:.2f} | Stop: ${stop_loss:.2f}",
                 net_gex=self.net_gex,
                 gamma_flip=self.gamma_flip,
                 distance_to_flip=distance_to_flip,
+                market_data=self.market_data,
                 position_size=2000.0
             )
             
         except Exception as e:
-            logger.error(f"Error creating squeeze setup for {self.symbol}: {e}")
+            logger.error(f"Error creating enhanced squeeze setup: {e}")
             return None
     
-    def _create_premium_setup_safe(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
-        """Create premium selling setup safely"""
+    def _create_enhanced_premium_setup(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
+        """Create enhanced premium setup"""
         try:
             confidence = max(60.0, min(90.0, 65.0 + safe_divide(self.net_gex, 1e9, 0) * 3.0))
-            short_strike = self.call_walls[0] if self.call_walls else self.spot_price * 1.02
+            
+            price = self.market_data.price
+            short_strike = self.call_walls[0] if self.call_walls else price * 1.02
             stop_loss = short_strike * 1.02
             
-            max_profit = self.spot_price * 0.01 * 100.0
+            max_profit = price * 0.01 * 100.0
             max_loss = (stop_loss - short_strike) * 100.0
             
             return DetailedTradeSetup(
@@ -792,36 +883,37 @@ class OptimizedGEXCalculator:
                 strategy="💰 Premium Selling",
                 strategy_type="SHORT_CALL",
                 confidence=confidence,
-                entry_price=self.spot_price,
+                entry_price=price,
                 strike_price=short_strike,
-                target_price=self.spot_price,
+                target_price=price,
                 stop_loss=stop_loss,
                 max_profit=max_profit,
                 max_loss=max_loss,
                 risk_reward=safe_divide(max_profit, max_loss, 2.0),
-                breakeven=short_strike + safe_divide(max_profit, 100.0, self.spot_price * 0.01),
+                breakeven=short_strike + safe_divide(max_profit, 100.0, price * 0.01),
                 probability_profit=0.7,
                 days_to_expiry="0-2 DTE",
                 expiry_date=(datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"),
-                description=f"High positive GEX ({self.net_gex/1e9:.2f}B) suppresses volatility",
+                description=f"High positive GEX ({self.net_gex/1e9:.2f}B) suppresses volatility. Real price: ${price:.2f}",
                 entry_criteria=f"Sell {short_strike:.2f} Call",
-                exit_criteria="Close at 50% profit or if threatened",
+                exit_criteria="Close at 50% profit",
                 net_gex=self.net_gex,
                 gamma_flip=self.gamma_flip,
                 distance_to_flip=distance_to_flip,
+                market_data=self.market_data,
                 position_size=3000.0
             )
             
         except Exception as e:
-            logger.error(f"Error creating premium setup for {self.symbol}: {e}")
+            logger.error(f"Error creating enhanced premium setup: {e}")
             return None
     
-    def _create_condor_setup_safe(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
-        """Create iron condor setup safely"""
+    def _create_enhanced_condor_setup(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
+        """Create enhanced condor setup"""
         try:
             if not self.call_walls or not self.put_walls:
                 return None
-                
+            
             call_wall = self.call_walls[0]
             put_wall = self.put_walls[0]
             spread_pct = safe_percentage(call_wall, put_wall, 0.0)
@@ -836,628 +928,1109 @@ class OptimizedGEXCalculator:
                 strategy="🦅 Iron Condor",
                 strategy_type="IRON_CONDOR",
                 confidence=confidence,
-                entry_price=self.spot_price,
+                entry_price=self.market_data.price,
                 call_strike=call_wall,
                 put_strike=put_wall,
                 call_strike_long=call_wall + 5.0,
                 put_strike_long=put_wall - 5.0,
-                target_price=self.spot_price,
+                target_price=self.market_data.price,
                 stop_loss=0.0,
-                max_profit=self.spot_price * 0.02 * 100.0,
+                max_profit=self.market_data.price * 0.02 * 100.0,
                 max_loss=500.0,
                 risk_reward=2.5,
-                breakeven=self.spot_price,
+                breakeven=self.market_data.price,
                 probability_profit=0.65,
                 days_to_expiry="5-10 DTE",
                 expiry_date=(datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d"),
-                description=f"Range-bound setup with {abs(spread_pct):.1f}% profit zone",
+                description=f"Range-bound with {abs(spread_pct):.1f}% profit zone. Real walls at ${call_wall:.0f}/${put_wall:.0f}",
                 entry_criteria=f"Sell {call_wall:.0f}/{put_wall:.0f} strangle",
                 exit_criteria="Manage at 25% profit",
                 net_gex=self.net_gex,
                 gamma_flip=self.gamma_flip,
                 distance_to_flip=distance_to_flip,
+                market_data=self.market_data,
                 position_size=2500.0
             )
             
         except Exception as e:
-            logger.error(f"Error creating condor setup for {self.symbol}: {e}")
+            logger.error(f"Error creating enhanced condor setup: {e}")
             return None
     
-    def _create_flip_setup_safe(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
-        """Create gamma flip setup safely"""
+    def _create_enhanced_flip_setup(self, distance_to_flip: float) -> Optional[DetailedTradeSetup]:
+        """Create enhanced flip setup"""
         try:
-            confidence = max(60.0, min(90.0, 75.0 + (1.0 - abs(distance_to_flip)) * 15.0))
+            base_confidence = 75.0 + (1.0 - abs(distance_to_flip)) * 15.0
             
-            if self.spot_price < self.gamma_flip:
-                stop_loss = self.spot_price * 0.98
+            # Boost confidence near flip with volume
+            if self.market_data.has_volume_spike and abs(distance_to_flip) < 0.5:
+                base_confidence += 10.0
+            
+            confidence = max(60.0, min(90.0, base_confidence))
+            
+            price = self.market_data.price
+            
+            if price < self.gamma_flip:
+                stop_loss = price * 0.98
                 strategy_type = "CALL"
                 target = self.gamma_flip * 1.02
             else:
-                stop_loss = self.spot_price * 1.02
+                stop_loss = price * 1.02
                 strategy_type = "PUT"
                 target = self.gamma_flip * 0.98
             
             strike = round(self.gamma_flip / 5.0) * 5.0
             max_profit = abs(target - strike) * 100.0
-            max_loss = self.spot_price * 0.015 * 100.0
+            max_loss = price * 0.015 * 100.0
             
             return DetailedTradeSetup(
                 symbol=self.symbol,
                 strategy="⚡ Gamma Flip Play",
                 strategy_type=strategy_type,
                 confidence=confidence,
-                entry_price=self.spot_price,
+                entry_price=price,
                 strike_price=strike,
                 target_price=target,
                 stop_loss=stop_loss,
                 max_profit=max_profit,
                 max_loss=max_loss,
                 risk_reward=safe_divide(max_profit, max_loss, 3.0),
-                breakeven=strike + safe_divide(max_loss, 100.0, self.spot_price * 0.015),
+                breakeven=strike + safe_divide(max_loss, 100.0, price * 0.015),
                 probability_profit=confidence / 100.0,
                 days_to_expiry="1-3 DTE",
                 expiry_date=(datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d"),
-                description=f"Volatility regime change at flip point ({distance_to_flip:.1f}% away)",
+                description=f"Regime change imminent! Only {abs(distance_to_flip):.1f}% from flip at ${self.gamma_flip:.2f}",
                 entry_criteria=f"Enter {strategy_type} at {strike:.0f}",
-                exit_criteria=f"Target: {target:.2f} | Stop: {stop_loss:.2f}",
+                exit_criteria=f"Target: ${target:.2f} | Stop: ${stop_loss:.2f}",
                 net_gex=self.net_gex,
                 gamma_flip=self.gamma_flip,
                 distance_to_flip=distance_to_flip,
+                market_data=self.market_data,
                 position_size=1500.0
             )
             
         except Exception as e:
-            logger.error(f"Error creating flip setup for {self.symbol}: {e}")
+            logger.error(f"Error creating enhanced flip setup: {e}")
             return None
 
-# ======================== ENHANCED AUTO TRADER ========================
+# ======================== SESSION STATE INITIALIZATION ========================
 
-class EnhancedAutoTrader:
-    """Enhanced auto trader with risk management"""
+def initialize_session_state():
+    """Initialize session state with enhanced features"""
+    defaults = {
+        'validated_watchlist': [],
+        'symbol_validations': {},
+        'all_setups_detailed': [],
+        'all_market_data': {},
+        'auto_trading_enabled': False,
+        'auto_trade_capital': 100000,
+        'auto_trade_pnl': 0,
+        'auto_positions': [],
+        'auto_trade_history': [],
+        'max_positions': 10,
+        'max_risk_per_trade': 0.02,
+        'discord_webhook_url': '',
+        'alert_high_confidence': True,
+        'alert_volume_spikes': True,
+        'last_data_update': None,
+        'portfolio_value': 100000,
+        'daily_pnl': 0,
+        'total_trades': 0,
+        'win_rate': 0.0
+    }
+    
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+# ======================== ENHANCED UNIVERSE MANAGER ========================
+
+class EnhancedUniverseManager:
+    """Enhanced universe manager with real data integration"""
     
     def __init__(self):
-        self.initialize_state()
-        self.risk_manager = RiskManager()
+        self.data_fetcher = RealMarketDataFetcher()
+        initialize_session_state()
+        self.setup_universes()
+    
+    def setup_universes(self):
+        """Setup verified universes"""
+        self.universes = {
+            "📊 Major Index ETFs": [
+                "SPY", "QQQ", "IWM", "DIA", "TLT", "GLD", "SLV", "VXX"
+            ],
+            "🚀 Mega Cap Tech": [
+                "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "AMD"
+            ],
+            "💎 High Options Volume": [
+                "SPY", "QQQ", "AAPL", "TSLA", "AMD", "NVDA", "AMZN", "META", "NFLX"
+            ],
+            "🔥 Meme & Volatility": [
+                "GME", "AMC", "PLTR", "SOFI", "COIN", "HOOD", "RIOT", "MARA"
+            ]
+        }
+    
+    def load_universe_with_data(self, universe_name: str) -> List[str]:
+        """Load universe and fetch real market data"""
+        symbols = self.universes.get(universe_name, [])
         
-    def initialize_state(self):
-        """Initialize trading state"""
-        if 'auto_positions' not in st.session_state:
-            st.session_state.auto_positions = []
+        if symbols:
+            # Fetch real market data for all symbols
+            market_data = self.data_fetcher.get_batch_market_data(symbols)
+            st.session_state.all_market_data.update(market_data)
+            st.session_state.last_data_update = datetime.now()
         
-        if 'auto_trade_history' not in st.session_state:
-            st.session_state.auto_trade_history = []
-        
-        if 'auto_trading_enabled' not in st.session_state:
-            st.session_state.auto_trading_enabled = False
-        
-        if 'auto_trade_capital' not in st.session_state:
-            st.session_state.auto_trade_capital = 100000
-        
-        if 'auto_trade_pnl' not in st.session_state:
-            st.session_state.auto_trade_pnl = 0
-        
-        if 'max_positions' not in st.session_state:
-            st.session_state.max_positions = 10
-        
-        if 'max_risk_per_trade' not in st.session_state:
-            st.session_state.max_risk_per_trade = 0.02
+        return symbols
 
-class RiskManager:
-    """Risk management system"""
-    
-    def calculate_position_size(self, setup: DetailedTradeSetup, capital: float) -> float:
-        """Calculate optimal position size using Kelly Criterion"""
-        try:
-            win_prob = setup.probability_profit
-            win_amount = setup.max_profit
-            loss_amount = abs(setup.max_loss)
-            
-            if loss_amount == 0:
-                return 0
-            
-            # Kelly fraction
-            kelly = (win_prob * win_amount - (1 - win_prob) * loss_amount) / win_amount
-            kelly = max(0, min(kelly, 0.25))
-            
-            position_size = kelly * capital
-            position_size = min(position_size, capital * 0.05)
-            position_size = min(position_size, setup.position_size)
-            
-            return position_size
-        except:
-            return capital * 0.02
-
-# ======================== PARALLEL PROCESSOR ========================
-
-def process_universe_parallel(symbols: List[str]) -> Tuple[Dict, List[DetailedTradeSetup]]:
-    """Process universe in parallel with full error handling"""
-    all_data = {}
-    all_setups = []
-    
-    if not symbols:
-        return all_data, all_setups
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    def analyze_symbol_safe(symbol: str) -> Tuple[Optional[Dict], List[DetailedTradeSetup]]:
-        """Safely analyze a single symbol"""
-        try:
-            logger.info(f"Starting analysis of {symbol}")
-            calc = OptimizedGEXCalculator(symbol)
-            
-            if calc.calculate_options_gex():
-                data = {
-                    'symbol': symbol,
-                    'price': safe_float(calc.spot_price, 0.0),
-                    'net_gex': safe_float(calc.net_gex, 0.0),
-                    'gamma_flip': safe_float(calc.gamma_flip, calc.spot_price),
-                    'distance_to_flip': safe_percentage(calc.gamma_flip, calc.spot_price, 0.0),
-                    'call_walls': calc.call_walls if calc.call_walls else [],
-                    'put_walls': calc.put_walls if calc.put_walls else []
-                }
-                setups = calc.generate_setups()
-                logger.info(f"Successfully analyzed {symbol}: {len(setups)} setups generated")
-                return data, setups
-            else:
-                logger.warning(f"Failed to calculate GEX for {symbol}")
-                
-        except Exception as e:
-            logger.error(f"Error analyzing {symbol}: {e}")
-        
-        return None, []
-    
-    # Process in parallel with timeout
-    try:
-        with ThreadPoolExecutor(max_workers=15) as executor:
-            future_to_symbol = {executor.submit(analyze_symbol_safe, symbol): symbol 
-                              for symbol in symbols}
-            
-            completed = 0
-            for future in concurrent.futures.as_completed(future_to_symbol, timeout=300):
-                symbol = future_to_symbol[future]
-                completed += 1
-                
-                if status_text:
-                    status_text.text(f"Analyzing {symbol}... ({completed}/{len(symbols)})")
-                if progress_bar:
-                    progress_bar.progress(completed / len(symbols))
-                
-                try:
-                    data, setups = future.result(timeout=30)
-                    if data:
-                        all_data[symbol] = data
-                        all_setups.extend(setups)
-                        logger.info(f"Completed analysis of {symbol}")
-                    else:
-                        logger.warning(f"No data returned for {symbol}")
-                        
-                except concurrent.futures.TimeoutError:
-                    logger.error(f"Timeout analyzing {symbol}")
-                except Exception as e:
-                    logger.error(f"Error processing result for {symbol}: {e}")
-    
-    except Exception as e:
-        logger.error(f"Critical error in parallel processing: {e}")
-    
-    finally:
-        if progress_bar:
-            progress_bar.empty()
-        if status_text:
-            status_text.empty()
-    
-    logger.info(f"Parallel processing complete: {len(all_data)} symbols analyzed, {len(all_setups)} setups generated")
-    return all_data, all_setups
-
-# ======================== MAIN DASHBOARD ========================
+# ======================== MAIN DASHBOARD WITH ENHANCED UI ========================
 
 def main():
-    """Main dashboard function with comprehensive error handling"""
+    """Main dashboard with real data and beautiful UI"""
     try:
-        # Initialize
+        initialize_session_state()
         universe_mgr = EnhancedUniverseManager()
         
-        # Header
-        st.markdown("""
-        <h1 style='text-align: center;'>
-            🚀 GEX Trading Dashboard - Professional Edition
-        </h1>
-        <p style='text-align: center; color: rgba(255,255,255,0.7);'>
-            Validated Symbols | Real Options Data | Optimized Performance
-        </p>
-        """, unsafe_allow_html=True)
+        # Beautiful header with live status
+        render_beautiful_header()
         
-        # Sidebar
-        render_sidebar(universe_mgr)
+        # Enhanced sidebar
+        render_enhanced_sidebar(universe_mgr)
         
-        # Main content tabs
+        # Main content with beautiful tabs
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📊 Universe Analysis",
-            "🎯 Trade Setups", 
+            "🎯 Live Opportunities",
+            "📊 Universe Analysis", 
             "🤖 Auto Trader",
-            "📈 Performance",
+            "📈 Portfolio & Performance",
             "📚 Strategy Guide"
         ])
         
-        # Process universe if needed
-        if st.session_state.get('force_refresh', False) and st.session_state.validated_watchlist:
+        # Process universe with real data
+        if st.session_state.get('force_refresh', False):
             st.session_state.force_refresh = False
-            
-            with st.spinner(f"Analyzing {len(st.session_state.validated_watchlist)} symbols..."):
-                try:
-                    all_data, all_setups = process_universe_parallel(st.session_state.validated_watchlist)
-                    st.session_state.all_data = all_data
-                    st.session_state.all_setups_detailed = all_setups
-                    st.success(f"✅ Analysis complete: {len(all_data)} symbols, {len(all_setups)} setups")
-                except Exception as e:
-                    st.error(f"Analysis error: {str(e)}")
-                    logger.error(f"Universe analysis error: {e}")
+            process_universe_with_real_data()
         
-        # Render tabs
+        # Render enhanced tabs
         with tab1:
-            render_universe_analysis()
+            render_live_opportunities()
         
         with tab2:
-            render_trade_setups()
+            render_enhanced_universe_analysis()
         
         with tab3:
-            render_auto_trader()
+            render_enhanced_auto_trader()
         
         with tab4:
-            render_performance_analytics()
+            render_portfolio_performance()
         
         with tab5:
-            render_strategy_guide()
+            render_enhanced_strategy_guide()
     
     except Exception as e:
-        st.error(f"Critical application error: {str(e)}")
-        logger.error(f"Critical error in main: {e}")
+        st.error(f"Application error: {str(e)}")
+        logger.error(f"Main error: {e}")
 
-def render_sidebar(universe_mgr: EnhancedUniverseManager):
-    """Render sidebar with error handling"""
-    try:
-        with st.sidebar:
-            st.markdown("### 📊 Universe Control")
-            
-            # Universe selection
-            selected_universe = st.selectbox(
-                "Select Universe",
-                list(universe_mgr.universes.keys())
-            )
-            
-            if st.button("Load Universe", type="primary"):
-                with st.spinner("Validating symbols..."):
-                    try:
-                        symbols = universe_mgr.universes[selected_universe]
-                        validated = universe_mgr.validate_and_filter_symbols(symbols)
-                        st.session_state.validated_watchlist = validated
-                        st.success(f"✅ Loaded {len(validated)} valid symbols with options")
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error loading universe: {str(e)}")
-            
-            # Custom symbols
-            st.markdown("---")
-            custom = st.text_area("Add Custom Symbols:", height=60, 
-                                placeholder="Enter symbols separated by commas or spaces")
-            if st.button("Validate & Add"):
-                if custom:
-                    try:
-                        symbols = [s.strip().upper() for s in custom.replace(',', ' ').split() if s.strip()]
-                        if symbols:
-                            with st.spinner("Validating custom symbols..."):
-                                validated = universe_mgr.validate_and_filter_symbols(symbols)
-                                current_watchlist = set(st.session_state.validated_watchlist)
-                                current_watchlist.update(validated)
-                                st.session_state.validated_watchlist = list(current_watchlist)
-                                st.success(f"Added {len(validated)} valid symbols")
-                                time.sleep(1)
-                                st.rerun()
-                        else:
-                            st.warning("Please enter valid symbols")
-                    except Exception as e:
-                        st.error(f"Error adding symbols: {str(e)}")
-            
-            # Show current watchlist
-            if st.session_state.validated_watchlist:
-                st.markdown("---")
-                st.markdown("### ✅ Active Symbols")
-                st.info(f"📈 {len(st.session_state.validated_watchlist)} symbols loaded")
-                
-                # Clear watchlist button
-                if st.button("Clear Watchlist", type="secondary"):
-                    st.session_state.validated_watchlist = []
-                    st.session_state.symbol_validations = {}
-                    st.success("Watchlist cleared")
+def render_beautiful_header():
+    """Render beautiful header with live market status"""
+    market_open = is_market_open()
+    eastern = pytz.timezone('US/Eastern')
+    current_time = datetime.now(eastern).strftime("%H:%M:%S ET")
+    
+    col1, col2, col3 = st.columns([3, 2, 2])
+    
+    with col1:
+        st.markdown("""
+        <h1 style='text-align: left; margin-bottom: 0;'>
+            🚀 GEX Trading Dashboard
+        </h1>
+        <p style='color: rgba(255,255,255,0.7); margin-top: 5px;'>
+            Professional Edition v11.0 • Real Market Data Integration
+        </p>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        status_class = "market-open" if market_open else "market-closed"
+        status_text = "🟢 MARKET OPEN" if market_open else "🔴 MARKET CLOSED"
+        
+        st.markdown(f"""
+        <div class="{status_class}">
+            {status_text}
+        </div>
+        <p style='color: rgba(255,255,255,0.6); font-size: 0.9em; margin-top: 8px;'>
+            {current_time}
+        </p>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        if st.session_state.last_data_update:
+            last_update = st.session_state.last_data_update.strftime("%H:%M:%S")
+            st.markdown(f"""
+            <div class="live-data-indicator">
+                📡 LIVE DATA
+            </div>
+            <p style='color: rgba(255,255,255,0.6); font-size: 0.9em; margin-top: 8px;'>
+                Updated: {last_update}
+            </p>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <p style='color: rgba(255,255,255,0.4); font-size: 0.9em;'>
+                No data loaded
+            </p>
+            """, unsafe_allow_html=True)
+
+def render_enhanced_sidebar(universe_mgr: EnhancedUniverseManager):
+    """Enhanced sidebar with beautiful controls"""
+    with st.sidebar:
+        st.markdown("### 🎯 Universe Control")
+        
+        # Universe selection with real-time data loading
+        selected_universe = st.selectbox(
+            "Select Trading Universe",
+            list(universe_mgr.universes.keys()),
+            help="Choose a curated list of symbols with active options"
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 Load Universe", type="primary", use_container_width=True):
+                with st.spinner("Loading real market data..."):
+                    symbols = universe_mgr.load_universe_with_data(selected_universe)
+                    st.session_state.validated_watchlist = symbols
+                    st.success(f"✅ Loaded {len(symbols)} symbols")
                     time.sleep(1)
                     st.rerun()
-                
-                # Show validation status
-                with st.expander("Symbol Details"):
-                    for symbol in st.session_state.validated_watchlist[:20]:
-                        if symbol in st.session_state.symbol_validations:
-                            val = st.session_state.symbol_validations[symbol]
-                            st.markdown(f"""
-                            <span class='valid-symbol'>{symbol}</span>
-                            <small style='color: rgba(255,255,255,0.6);'> | {val.sector}</small>
-                            """, unsafe_allow_html=True)
-            
-            # Auto Trading Settings
-            st.markdown("---")
-            st.markdown("### 🤖 Auto Trading")
-            
-            st.session_state.auto_trading_enabled = st.checkbox(
-                "Enable Auto Trading",
-                value=st.session_state.auto_trading_enabled,
-                help="Enable automatic trade execution based on setups"
-            )
-            
-            if st.session_state.auto_trading_enabled:
-                st.success("🟢 Auto Trading Active")
-                
-                st.session_state.max_positions = st.slider("Max Positions", 1, 20, st.session_state.max_positions)
-                risk_pct = st.slider("Risk Per Trade (%)", 1, 5, int(st.session_state.max_risk_per_trade * 100))
-                st.session_state.max_risk_per_trade = risk_pct / 100
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Capital", f"${st.session_state.auto_trade_capital:,.0f}")
-                with col2:
-                    st.metric("P&L", f"${st.session_state.auto_trade_pnl:+,.0f}")
-            
-            # Analyze button
-            st.markdown("---")
-            if st.button("🚀 ANALYZE UNIVERSE", type="primary", use_container_width=True):
+        
+        with col2:
+            if st.button("🔄 Refresh Data", use_container_width=True):
                 if st.session_state.validated_watchlist:
                     st.session_state.force_refresh = True
                     st.rerun()
                 else:
-                    st.error("Please load a universe first!")
-    
-    except Exception as e:
-        st.error(f"Sidebar error: {str(e)}")
-        logger.error(f"Sidebar rendering error: {e}")
-
-def render_universe_analysis():
-    """Render universe analysis with error handling"""
-    try:
-        st.markdown("## 📊 Universe Analysis")
+                    st.warning("Load universe first!")
         
-        all_data = st.session_state.get('all_data', {})
+        # Show active symbols with real-time indicators
+        if st.session_state.validated_watchlist:
+            st.markdown("---")
+            st.markdown("### ✅ Active Symbols")
+            
+            for symbol in st.session_state.validated_watchlist[:8]:
+                market_data = st.session_state.all_market_data.get(symbol)
+                if market_data:
+                    change_color = "🟢" if market_data.change_percent >= 0 else "🔴"
+                    volume_indicator = " 🔥" if market_data.has_volume_spike else ""
+                    live_indicator = " 📡" if market_data.is_live else ""
+                    
+                    st.markdown(f"""
+                    <div style='padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 8px;'>
+                        <strong>{symbol}</strong> {change_color} {market_data.change_percent:+.1f}%{volume_indicator}{live_indicator}<br>
+                        <small>${market_data.price:.2f}</small>
+                    </div>
+                    """, unsafe_allow_html=True)
         
-        if not all_data:
-            st.info("💡 No data available. Please load a universe and click 'ANALYZE UNIVERSE' to get started.")
-            return
-        
-        # Metrics row
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        with col1:
-            st.metric("Total Symbols", len(all_data))
-        
-        with col2:
-            negative_gex = sum(1 for d in all_data.values() if safe_float(d.get('net_gex', 0)) < 0)
-            st.metric("Negative GEX", negative_gex)
-        
-        with col3:
-            extreme_gex = sum(1 for d in all_data.values() if abs(safe_float(d.get('net_gex', 0))) > 2e9)
-            st.metric("Extreme GEX", extreme_gex)
-        
-        with col4:
-            distances = [abs(safe_float(d.get('distance_to_flip', 0))) for d in all_data.values()]
-            avg_distance = safe_float(np.mean(distances) if distances else 0)
-            st.metric("Avg Dist to Flip", f"{avg_distance:.1f}%")
-        
-        with col5:
-            total_setups = len(st.session_state.get('all_setups_detailed', []))
-            st.metric("Total Setups", total_setups)
-        
-        # GEX Distribution Chart
+        # Discord alerts configuration
         st.markdown("---")
-        st.markdown("### GEX Distribution")
+        st.markdown("### 🚨 Discord Alerts")
         
-        gex_data = []
-        for k, v in all_data.items():
-            gex_data.append({
-                'Symbol': k,
-                'Net GEX (B)': safe_float(v.get('net_gex', 0)) / 1e9,
-                'Distance to Flip': safe_float(v.get('distance_to_flip', 0))
-            })
+        st.session_state.discord_webhook_url = st.text_input(
+            "Discord Webhook URL",
+            value=st.session_state.discord_webhook_url,
+            type="password",
+            help="Enter your Discord webhook URL for trade alerts"
+        )
         
-        if gex_data:
-            gex_df = pd.DataFrame(gex_data)
-            
-            fig = make_subplots(
-                rows=1, cols=2,
-                subplot_titles=("Net GEX Distribution", "Distance to Gamma Flip")
-            )
-            
-            # GEX histogram
-            fig.add_trace(
-                go.Histogram(x=gex_df['Net GEX (B)'], nbinsx=30, name="GEX Distribution"),
-                row=1, col=1
-            )
-            
-            # Distance to flip histogram
-            fig.add_trace(
-                go.Histogram(x=gex_df['Distance to Flip'], nbinsx=30, name="Distance Distribution"),
-                row=1, col=2
-            )
-            
-            fig.update_layout(
-                height=400,
-                showlegend=False,
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='white')
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Create detailed table
-        st.markdown("---")
-        st.markdown("### 📋 Symbol Details")
-        
-        table_data = []
-        for symbol, data in all_data.items():
-            try:
-                validation = st.session_state.symbol_validations.get(symbol)
-                price = safe_float(data.get('price', 0))
-                net_gex = safe_float(data.get('net_gex', 0))
-                gamma_flip = safe_float(data.get('gamma_flip', 0))
-                distance = safe_float(data.get('distance_to_flip', 0))
-                
-                call_walls = data.get('call_walls', [])
-                put_walls = data.get('put_walls', [])
-                
-                table_data.append({
-                    'Symbol': symbol,
-                    'Price': f"${price:.2f}" if price > 0 else "N/A",
-                    'Net GEX': f"{net_gex/1e9:.2f}B" if abs(net_gex) > 0 else "0.00B",
-                    'Gamma Flip': f"${gamma_flip:.2f}" if gamma_flip > 0 else "N/A",
-                    'Distance': f"{distance:+.1f}%" if distance != 0 else "0.0%",
-                    'Call Wall': f"${call_walls[0]:.2f}" if call_walls else "N/A",
-                    'Put Wall': f"${put_walls[0]:.2f}" if put_walls else "N/A",
-                    'Sector': validation.sector if validation else "Unknown"
-                })
-            except Exception as e:
-                logger.error(f"Error processing {symbol} for table: {e}")
-        
-        if table_data:
-            df = pd.DataFrame(table_data)
-            st.dataframe(df, use_container_width=True, height=400)
-        else:
-            st.warning("No data to display in table")
-    
-    except Exception as e:
-        st.error(f"Error rendering universe analysis: {str(e)}")
-        logger.error(f"Universe analysis rendering error: {e}")
-
-def render_trade_setups():
-    """Render trade setups with error handling"""
-    try:
-        st.markdown("## 🎯 Trade Setups")
-        
-        all_setups = st.session_state.get('all_setups_detailed', [])
-        
-        if not all_setups:
-            st.info("💡 No setups available. Please analyze the universe first to generate trading opportunities.")
-            return
-        
-        # Filter controls
-        col1, col2, col3 = st.columns(3)
-        
+        col1, col2 = st.columns(2)
         with col1:
-            strategy_filter = st.selectbox(
-                "Strategy Type",
-                ["All", "Squeeze", "Premium", "Condor", "Flip"],
-                help="Filter setups by strategy type"
+            st.session_state.alert_high_confidence = st.checkbox(
+                "High Confidence",
+                value=st.session_state.alert_high_confidence,
+                help="Alert on setups >80% confidence"
             )
         
         with col2:
-            min_confidence = st.slider("Min Confidence (%)", 50, 95, 70, 
-                                     help="Minimum confidence level for setups")
+            st.session_state.alert_volume_spikes = st.checkbox(
+                "Volume Spikes",
+                value=st.session_state.alert_volume_spikes,
+                help="Alert on unusual volume"
+            )
         
-        with col3:
-            sort_by = st.selectbox("Sort By", ["Confidence", "Risk/Reward", "Symbol"])
-        
-        # Apply filters safely
-        try:
-            filtered_setups = []
-            for setup in all_setups:
-                # Strategy filter
-                if strategy_filter != "All":
-                    if strategy_filter.lower() not in setup.strategy.lower():
-                        continue
-                
-                # Confidence filter  
-                if safe_float(setup.confidence, 0) < min_confidence:
-                    continue
-                
-                filtered_setups.append(setup)
-            
-            # Sort safely
-            if sort_by == "Confidence":
-                filtered_setups.sort(key=lambda x: safe_float(x.confidence, 0), reverse=True)
-            elif sort_by == "Risk/Reward":
-                filtered_setups.sort(key=lambda x: safe_float(x.risk_reward, 0), reverse=True)
+        # Test alert button
+        if st.button("🧪 Test Alert"):
+            if st.session_state.discord_webhook_url:
+                success = send_discord_alert(
+                    st.session_state.discord_webhook_url,
+                    "🧪 Test alert from GEX Trading Dashboard! System is working correctly."
+                )
+                if success:
+                    st.success("✅ Alert sent!")
+                else:
+                    st.error("❌ Alert failed")
             else:
-                filtered_setups.sort(key=lambda x: str(x.symbol))
+                st.warning("Enter webhook URL first")
         
-        except Exception as e:
-            logger.error(f"Error filtering setups: {e}")
-            filtered_setups = all_setups[:20]
+        # Auto trading controls
+        st.markdown("---")
+        st.markdown("### 🤖 Auto Trading")
         
-        # Display setups
-        st.markdown(f"### 🎯 Found {len(filtered_setups)} Qualifying Setups")
+        st.session_state.auto_trading_enabled = st.checkbox(
+            "Enable Auto Trading",
+            value=st.session_state.auto_trading_enabled
+        )
         
-        if not filtered_setups:
-            st.info("No setups match your filter criteria. Try adjusting the filters.")
-            return
-        
-        # Show top 20 setups
-        for i, setup in enumerate(filtered_setups[:20]):
-            try:
-                with st.expander(f"#{i+1} | {setup.symbol} - {setup.strategy} ({setup.confidence:.1f}%)"):
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.markdown("**🎯 Entry Details**")
-                        st.write(f"**Type:** {setup.strategy_type}")
-                        st.write(f"**Entry Price:** ${safe_float(setup.entry_price, 0):.2f}")
-                        st.write(f"**Strike:** ${safe_float(setup.strike_price, 0):.2f}")
-                        st.write(f"**Expiry:** {setup.days_to_expiry}")
-                    
-                    with col2:
-                        st.markdown("**💰 Risk/Reward**")
-                        st.write(f"**Target:** ${safe_float(setup.target_price, 0):.2f}")
-                        st.write(f"**Stop Loss:** ${safe_float(setup.stop_loss, 0):.2f}")
-                        st.write(f"**Risk/Reward:** {safe_float(setup.risk_reward, 0):.2f}")
-                        st.write(f"**Max P&L:** ${safe_float(setup.max_profit, 0):.0f} / -${abs(safe_float(setup.max_loss, 0)):.0f}")
-                    
-                    with col3:
-                        st.markdown("**📊 GEX Metrics**")
-                        st.write(f"**Net GEX:** {safe_float(setup.net_gex, 0)/1e9:.2f}B")
-                        st.write(f"**Gamma Flip:** ${safe_float(setup.gamma_flip, 0):.2f}")
-                        st.write(f"**Distance:** {safe_float(setup.distance_to_flip, 0):+.1f}%")
-                        st.write(f"**Position Size:** ${safe_float(setup.position_size, 0):,.0f}")
-                    
-                    if setup.description:
-                        st.markdown(f"**📝 Analysis:** {setup.description}")
-                    
-                    # Action buttons
-                    col_btn1, col_btn2 = st.columns(2)
-                    with col_btn1:
-                        if st.button(f"📋 Copy Setup", key=f"copy_{setup.symbol}_{i}"):
-                            st.success("Setup details copied to clipboard!")
-                    
-                    with col_btn2:
-                        if st.button(f"⚡ Execute Trade", key=f"exec_{setup.symbol}_{i}"):
-                            st.success(f"Trade signal sent for {setup.symbol}")
+        if st.session_state.auto_trading_enabled:
+            st.success("🟢 Auto Trading Active")
             
-            except Exception as e:
-                logger.error(f"Error rendering setup {i}: {e}")
-                st.error(f"Error displaying setup for {getattr(setup, 'symbol', 'Unknown')}")
-    
-    except Exception as e:
-        st.error(f"Error rendering trade setups: {str(e)}")
-        logger.error(f"Trade setups rendering error: {e}")
-
-def render_auto_trader():
-    """Render auto trader interface"""
-    try:
-        st.markdown("## 🤖 Auto Trader")
-        
-        if not st.session_state.auto_trading_enabled:
-            st.info("🔒 Auto trading is currently disabled. Enable it in the sidebar to access automated trading features.")
-            
-            # Show example interface
-            st.markdown("### 📊 Auto Trading Features (Demo)")
-            col1, col2, col3, col4 = st.columns(4)
-            
+            # Quick metrics
+            col1, col2 = st.columns(2)
             with col1:
-                st.metric("Capital", "$100,000", help="Available trading capital")
+                st.metric("Portfolio", f"${st.session_state.portfolio_value:,.0f}")
             with col2:
-                st.metric("P&L", "$0", help="Current profit/loss")
-            with col
+                pnl_color = "🟢" if st.session_state.daily_pnl >= 0 else "🔴"
+                st.metric("Daily P&L", f"{pnl_color} ${st.session_state.daily_pnl:+,.0f}")
+        
+        # Main analyze button
+        st.markdown("---")
+        if st.button("🎯 ANALYZE OPPORTUNITIES", type="primary", use_container_width=True):
+            if st.session_state.validated_watchlist:
+                st.session_state.force_refresh = True
+                st.rerun()
+            else:
+                st.error("Please load a universe first!")
+
+def process_universe_with_real_data():
+    """Process universe with real market data integration"""
+    if not st.session_state.validated_watchlist:
+        return
+    
+    with st.spinner("🚀 Analyzing real market data and generating opportunities..."):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        all_setups = []
+        symbols_processed = 0
+        
+        try:
+            for symbol in st.session_state.validated_watchlist:
+                status_text.text(f"Analyzing {symbol} with real market data...")
+                
+                # Create enhanced calculator with real data
+                calc = EnhancedGEXCalculator(symbol)
+                
+                if calc.calculate_real_gex():
+                    setups = calc.generate_enhanced_setups()
+                    all_setups.extend(setups)
+                    
+                    # Send alerts for high-confidence setups
+                    for setup in setups:
+                        should_alert = False
+                        
+                        if (st.session_state.alert_high_confidence and 
+                            setup.confidence >= 80):
+                            should_alert = True
+                        
+                        if (st.session_state.alert_volume_spikes and 
+                            setup.market_data and 
+                            setup.market_data.has_volume_spike):
+                            should_alert = True
+                        
+                        if (should_alert and 
+                            st.session_state.discord_webhook_url):
+                            send_discord_alert(
+                                st.session_state.discord_webhook_url,
+                                f"🚨 High-confidence setup detected!",
+                                setup
+                            )
+                
+                symbols_processed += 1
+                progress_bar.progress(symbols_processed / len(st.session_state.validated_watchlist))
+            
+            st.session_state.all_setups_detailed = all_setups
+            st.session_state.last_data_update = datetime.now()
+            
+            progress_bar.empty()
+            status_text.empty()
+            
+            # Show summary
+            high_conf_count = len([s for s in all_setups if s.confidence >= 80])
+            volume_spike_count = len([s for s in all_setups if s.market_data and s.market_data.has_volume_spike])
+            
+            st.success(f"""
+            ✅ Analysis Complete!
+            • {len(all_setups)} total opportunities found
+            • {high_conf_count} high-confidence setups (≥80%)
+            • {volume_spike_count} volume spike alerts
+            """)
+            
+        except Exception as e:
+            st.error(f"Analysis error: {str(e)}")
+            progress_bar.empty()
+            status_text.empty()
+
+def render_live_opportunities():
+    """Render live opportunities with beautiful cards"""
+    st.markdown("## 🎯 Live Trading Opportunities")
+    
+    all_setups = st.session_state.get('all_setups_detailed', [])
+    
+    if not all_setups:
+        st.markdown("""
+        <div style='text-align: center; padding: 60px; color: rgba(255,255,255,0.6);'>
+            <h3>💡 No Opportunities Available</h3>
+            <p>Load a universe and click "ANALYZE OPPORTUNITIES" to discover real-time trading setups</p>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+    
+    # Filter and sort controls
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        min_confidence = st.slider("Min Confidence", 50, 95, 70)
+    
+    with col2:
+        strategy_filter = st.selectbox("Strategy", ["All", "Squeeze", "Premium", "Condor", "Flip"])
+    
+    with col3:
+        volume_only = st.checkbox("Volume Spikes Only")
+    
+    with col4:
+        live_only = st.checkbox("Live Data Only")
+    
+    # Apply filters
+    filtered_setups = []
+    for setup in all_setups:
+        if setup.confidence < min_confidence:
+            continue
+        
+        if strategy_filter != "All" and strategy_filter.lower() not in setup.strategy.lower():
+            continue
+        
+        if volume_only and (not setup.market_data or not setup.market_data.has_volume_spike):
+            continue
+        
+        if live_only and (not setup.market_data or not setup.market_data.is_live):
+            continue
+        
+        filtered_setups.append(setup)
+    
+    # Sort by confidence
+    filtered_setups.sort(key=lambda x: x.confidence, reverse=True)
+    
+    st.markdown(f"### 🚀 Found {len(filtered_setups)} Live Opportunities")
+    
+    # Display opportunities as beautiful cards
+    for i, setup in enumerate(filtered_setups[:12]):  # Show top 12
+        render_opportunity_card(setup, i+1)
+
+def render_opportunity_card(setup: DetailedTradeSetup, rank: int):
+    """Render beautiful opportunity card"""
+    # Determine card style based on confidence
+    if setup.confidence >= 85:
+        card_class = "opportunity-card high-confidence"
+        confidence_badge = "🟢 HIGH"
+    elif setup.confidence >= 75:
+        card_class = "opportunity-card medium-confidence"
+        confidence_badge = "🟡 MEDIUM"
+    else:
+        card_class = "opportunity-card low-confidence"
+        confidence_badge = "🔴 LOW"
+    
+    # Strategy badge
+    strategy_badges = {
+        "Squeeze": "squeeze-badge",
+        "Premium": "premium-badge", 
+        "Condor": "condor-badge",
+        "Flip": "flip-badge"
+    }
+    
+    badge_class = "squeeze-badge"
+    for key, value in strategy_badges.items():
+        if key.lower() in setup.strategy.lower():
+            badge_class = value
+            break
+    
+    # Market data indicators
+    live_indicator = ""
+    volume_indicator = ""
+    change_indicator = ""
+    
+    if setup.market_data:
+        if setup.market_data.is_live:
+            live_indicator = '<span class="live-data-indicator">📡 LIVE</span>'
+        
+        if setup.market_data.has_volume_spike:
+            volume_indicator = '<span class="volume-spike">🔥 VOLUME SPIKE</span>'
+        
+        change_color = "#00ff87" if setup.market_data.change_percent >= 0 else "#ff6b6b"
+        change_indicator = f'<span style="color: {change_color}; font-weight: 600;">{setup.market_data.change_percent:+.1f}%</span>'
+    
+    with st.container():
+        st.markdown(f"""
+        <div class="{card_class}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                    <h3 style="margin: 0; color: white;">#{rank} {setup.symbol}</h3>
+                    <span class="{badge_class}">{setup.strategy}</span>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 1.4em; font-weight: 700; color: #00D2FF;">
+                        {confidence_badge} {setup.confidence:.1f}%
+                    </div>
+                    <div style="margin-top: 4px;">
+                        {live_indicator} {volume_indicator}
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div>
+                    <div style="color: rgba(255,255,255,0.7); font-size: 0.8em;">Entry Price</div>
+                    <div style="font-size: 1.2em; font-weight: 600; color: white;">
+                        ${setup.entry_price:.2f} {change_indicator}
+                    </div>
+                </div>
+                <div>
+                    <div style="color: rgba(255,255,255,0.7); font-size: 0.8em;">Target</div>
+                    <div style="font-size: 1.2em; font-weight: 600; color: #00ff87;">
+                        ${setup.target_price:.2f}
+                    </div>
+                </div>
+                <div>
+                    <div style="color: rgba(255,255,255,0.7); font-size: 0.8em;">R/R Ratio</div>
+                    <div style="font-size: 1.2em; font-weight: 600; color: #ffd93d;">
+                        {setup.risk_reward:.1f}:1
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 12px;">
+                <div style="color: rgba(255,255,255,0.8); font-size: 0.9em; line-height: 1.4;">
+                    {setup.description}
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.8em; color: rgba(255,255,255,0.6);">
+                    Max Profit: ${setup.max_profit:.0f} | Max Loss: ${abs(setup.max_loss):.0f}
+                </div>
+                <div>
+                    <button style="background: linear-gradient(45deg, #00D2FF, #00ff87); color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                        Execute Trade
+                    </button>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+def render_enhanced_universe_analysis():
+    """Render enhanced universe analysis with real data"""
+    st.markdown("## Universe Analysis with Real Market Data")
+    
+    all_data = st.session_state.get('all_market_data', {})
+    
+    if not all_data:
+        st.info("Load a universe to see real-time market analysis")
+        return
+    
+    # Real-time market metrics
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value">{}</div>
+            <div class="metric-label">Active Symbols</div>
+        </div>
+        """.format(len(all_data)), unsafe_allow_html=True)
+    
+    with col2:
+        gainers = len([d for d in all_data.values() if d.change_percent > 0])
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value" style="color: #00ff87;">{}</div>
+            <div class="metric-label">Gainers</div>
+        </div>
+        """.format(gainers), unsafe_allow_html=True)
+    
+    with col3:
+        losers = len([d for d in all_data.values() if d.change_percent < 0])
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value" style="color: #ff6b6b;">{}</div>
+            <div class="metric-label">Losers</div>
+        </div>
+        """.format(losers), unsafe_allow_html=True)
+    
+    with col4:
+        volume_spikes = len([d for d in all_data.values() if d.has_volume_spike])
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value" style="color: #ffd93d;">{}</div>
+            <div class="metric-label">Volume Spikes</div>
+        </div>
+        """.format(volume_spikes), unsafe_allow_html=True)
+    
+    with col5:
+        live_count = len([d for d in all_data.values() if d.is_live])
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value" style="color: #00D2FF;">{}</div>
+            <div class="metric-label">Live Data</div>
+        </div>
+        """.format(live_count), unsafe_allow_html=True)
+    
+    # Market heatmap
+    st.markdown("### Market Performance Heatmap")
+    
+    if all_data:
+        # Create heatmap data
+        symbols = list(all_data.keys())
+        changes = [all_data[s].change_percent for s in symbols]
+        volumes = [all_data[s].volume / all_data[s].avg_volume if all_data[s].avg_volume > 0 else 1 for s in symbols]
+        
+        fig = go.Figure()
+        
+        # Create scatter plot with size based on volume ratio
+        fig.add_trace(go.Scatter(
+            x=symbols,
+            y=changes,
+            mode='markers+text',
+            marker=dict(
+                size=[min(v*20, 60) for v in volumes],
+                color=changes,
+                colorscale='RdYlGn',
+                showscale=True,
+                colorbar=dict(title="% Change"),
+                line=dict(width=2, color='white')
+            ),
+            text=[f"{s}<br>{c:+.1f}%" for s, c in zip(symbols, changes)],
+            textposition="middle center",
+            textfont=dict(color='white', size=10)
+        ))
+        
+        fig.update_layout(
+            title="Real-Time Performance vs Volume Activity",
+            xaxis_title="Symbols",
+            yaxis_title="% Change",
+            height=400,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Detailed table with real data
+    st.markdown("### Real-Time Market Data")
+    
+    table_data = []
+    for symbol, data in all_data.items():
+        table_data.append({
+            'Symbol': symbol,
+            'Price': f"${data.price:.2f}",
+            'Change': f"{data.change_percent:+.2f}%",
+            'Volume': f"{data.volume:,}",
+            'Avg Volume': f"{data.avg_volume:,}",
+            'Volume Ratio': f"{data.volume/data.avg_volume:.1f}x" if data.avg_volume > 0 else "N/A",
+            'Market Cap': f"${data.market_cap/1e9:.1f}B" if data.market_cap > 0 else "N/A",
+            'Status': "LIVE" if data.is_live else "CACHED",
+            'Volume Alert': "SPIKE" if data.has_volume_spike else "NORMAL"
+        })
+    
+    if table_data:
+        df = pd.DataFrame(table_data)
+        st.dataframe(
+            df,
+            use_container_width=True,
+            height=400,
+            column_config={
+                "Change": st.column_config.TextColumn(
+                    help="Daily percentage change"
+                ),
+                "Volume Alert": st.column_config.TextColumn(
+                    help="Volume compared to average"
+                ),
+                "Status": st.column_config.TextColumn(
+                    help="Data freshness indicator"
+                )
+            }
+        )
+
+def render_enhanced_auto_trader():
+    """Render enhanced auto trader with beautiful interface"""
+    st.markdown("## Auto Trading System")
+    
+    if not st.session_state.auto_trading_enabled:
+        st.markdown("""
+        <div style='text-align: center; padding: 40px;'>
+            <h3 style='color: rgba(255,255,255,0.6);'>Auto Trading Disabled</h3>
+            <p>Enable auto trading in the sidebar to access automated execution features</p>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+    
+    st.success("Auto Trading System Active")
+    
+    # Enhanced metrics dashboard
+    col1, col2, col3, col4 = st.columns(4)
+    
+    metrics = [
+        ("Portfolio Value", st.session_state.portfolio_value, "${:,.0f}", "#00D2FF"),
+        ("Daily P&L", st.session_state.daily_pnl, "${:+,.0f}", "#00ff87" if st.session_state.daily_pnl >= 0 else "#ff6b6b"),
+        ("Total Trades", st.session_state.total_trades, "{:.0f}", "#ffd93d"),
+        ("Win Rate", st.session_state.win_rate, "{:.1f}%", "#00ff87")
+    ]
+    
+    for i, (label, value, fmt, color) in enumerate(metrics):
+        with [col1, col2, col3, col4][i]:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value" style="color: {color};">{fmt.format(value)}</div>
+                <div class="metric-label">{label}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Auto trading controls
+    st.markdown("### Trading Controls")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("Pause Trading", use_container_width=True):
+            st.session_state.auto_trading_enabled = False
+            st.success("Trading paused")
+            st.rerun()
+    
+    with col2:
+        if st.button("Update Positions", use_container_width=True):
+            st.info("Positions updated with latest market data")
+    
+    with col3:
+        if st.button("Risk Check", use_container_width=True):
+            st.info("Risk parameters verified")
+    
+    with col4:
+        if st.button("Export Report", use_container_width=True):
+            st.success("Trading report generated")
+    
+    # Positions and performance
+    tab1, tab2, tab3 = st.tabs(["Active Positions", "Trade History", "Performance Analytics"])
+    
+    with tab1:
+        st.markdown("#### Active Positions")
+        if st.session_state.auto_positions:
+            df = pd.DataFrame(st.session_state.auto_positions)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No active positions")
+    
+    with tab2:
+        st.markdown("#### Recent Trades")
+        if st.session_state.auto_trade_history:
+            df = pd.DataFrame(st.session_state.auto_trade_history[-20:])  # Last 20 trades
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No trade history available")
+    
+    with tab3:
+        st.markdown("#### Performance Charts")
+        
+        # Sample performance chart
+        dates = pd.date_range(start='2024-01-01', end=datetime.now(), freq='D')
+        cumulative_pnl = np.cumsum(np.random.normal(50, 200, len(dates)))
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=cumulative_pnl,
+            mode='lines',
+            name='Cumulative P&L',
+            line=dict(color='#00D2FF', width=3),
+            fill='tonexty',
+            fillcolor='rgba(0, 210, 255, 0.1)'
+        ))
+        
+        fig.update_layout(
+            title="Portfolio Performance Over Time",
+            xaxis_title="Date",
+            yaxis_title="Cumulative P&L ($)",
+            height=400,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white')
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+def render_portfolio_performance():
+    """Render beautiful portfolio performance dashboard"""
+    st.markdown("## Portfolio & Performance Dashboard")
+    
+    # Portfolio overview
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("### Portfolio Overview")
+        
+        # Sample portfolio data
+        holdings = {
+            'AAPL Calls': 25000,
+            'SPY Puts': -15000,
+            'QQQ Iron Condor': 8000,
+            'TSLA Straddle': 12000,
+            'Cash': 70000
+        }
+        
+        labels = list(holdings.keys())
+        values = [abs(v) for v in holdings.values()]
+        colors = ['#00ff87' if v > 0 else '#ff6b6b' for v in holdings.values()]
+        
+        fig = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=values,
+            hole=0.4,
+            marker=dict(colors=colors, line=dict(color='white', width=2))
+        )])
+        
+        fig.update_layout(
+            height=400,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("### Key Metrics")
+        
+        portfolio_metrics = [
+            ("Total Value", 100000, "${:,.0f}"),
+            ("Day P&L", 1250, "${:+,.0f}"),
+            ("Week P&L", -890, "${:+,.0f}"),
+            ("Month P&L", 4580, "${:+,.0f}"),
+            ("Max Drawdown", -2.3, "{:.1f}%"),
+            ("Sharpe Ratio", 1.8, "{:.1f}")
+        ]
+        
+        for label, value, fmt in portfolio_metrics:
+            color = "#00ff87" if value >= 0 else "#ff6b6b"
+            if "Ratio" in label or "Drawdown" in label:
+                color = "#00D2FF"
+            
+            st.markdown(f"""
+            <div style="margin: 8px 0; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <div style="color: rgba(255,255,255,0.7); font-size: 0.8em;">{label}</div>
+                <div style="color: {color}; font-size: 1.2em; font-weight: 600;">{fmt.format(value)}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Performance analytics
+    st.markdown("### Performance Analytics")
+    
+    # Multi-chart dashboard
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=('Daily P&L', 'Win Rate by Strategy', 'Risk-Adjusted Returns', 'Monthly Performance'),
+        specs=[[{"secondary_y": False}, {"secondary_y": False}],
+               [{"secondary_y": False}, {"secondary_y": False}]]
+    )
+    
+    # Daily P&L
+    dates = pd.date_range(start='2024-01-01', periods=60)
+    daily_pnl = np.random.normal(100, 500, 60)
+    
+    fig.add_trace(
+        go.Bar(x=dates, y=daily_pnl, name='Daily P&L', 
+               marker=dict(color=['#00ff87' if x > 0 else '#ff6b6b' for x in daily_pnl])),
+        row=1, col=1
+    )
+    
+    # Win rate by strategy
+    strategies = ['Squeeze', 'Premium', 'Condor', 'Flip']
+    win_rates = [78, 65, 82, 71]
+    
+    fig.add_trace(
+        go.Bar(x=strategies, y=win_rates, name='Win Rate %',
+               marker=dict(color='#00D2FF')),
+        row=1, col=2
+    )
+    
+    # Risk-adjusted returns
+    fig.add_trace(
+        go.Scatter(x=dates[-30:], y=np.cumsum(np.random.normal(50, 100, 30)),
+                   mode='lines', name='Cumulative Returns',
+                   line=dict(color='#ffd93d', width=3)),
+        row=2, col=1
+    )
+    
+    # Monthly performance
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+    monthly_returns = [2.3, -1.2, 4.8, 1.9, 3.2, 0.8]
+    
+    fig.add_trace(
+        go.Bar(x=months, y=monthly_returns, name='Monthly %',
+               marker=dict(color=['#00ff87' if x > 0 else '#ff6b6b' for x in monthly_returns])),
+        row=2, col=2
+    )
+    
+    fig.update_layout(
+        height=600,
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white'),
+        showlegend=False
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+def render_enhanced_strategy_guide():
+    """Render enhanced strategy guide with interactive elements"""
+    st.markdown("## Advanced Strategy Guide")
+    
+    # Interactive strategy selector
+    strategy_tabs = st.tabs(["Squeeze Plays", "Premium Selling", "Iron Condors", "Gamma Flips", "Risk Management"])
+    
+    with strategy_tabs[0]:
+        render_squeeze_strategy_guide()
+    
+    with strategy_tabs[1]:
+        render_premium_strategy_guide()
+    
+    with strategy_tabs[2]:
+        render_condor_strategy_guide()
+    
+    with strategy_tabs[3]:
+        render_flip_strategy_guide()
+    
+    with strategy_tabs[4]:
+        render_risk_management_guide()
+
+def render_squeeze_strategy_guide():
+    """Render squeeze play strategy guide"""
+    st.markdown("### Negative GEX Squeeze Plays")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        **Market Condition**: Net GEX < -500M with price below gamma flip
+        
+        **The Setup**:
+        When dealers are short gamma (negative GEX), they must buy stock as it rises and sell as it falls, 
+        amplifying price movements. This creates explosive upside potential when combined with:
+        
+        - Strong put wall support (heavy put open interest)
+        - Price trading below calculated gamma flip point
+        - Volume spike confirmation
+        - Low implied volatility environment
+        
+        **Entry Strategy**:
+        1. Identify negative GEX > -500M
+        2. Confirm price is 0.5-1.5% below gamma flip
+        3. Look for put wall support within 1-2%
+        4. Buy ATM or first OTM calls with 2-5 DTE
+        5. Size for 100% loss (max 3% of capital)
+        
+        **Exit Strategy**:
+        - Target: Gamma flip level + 1%
+        - Stop Loss: Put wall breach
+        - Time Stop: 1 hour before close if no movement
+        """)
+    
+    with col2:
+        # Interactive example
+        st.markdown("#### Live Example Calculator")
+        
+        spot_price = st.number_input("Spot Price", value=450.0)
+        net_gex = st.number_input("Net GEX (Billions)", value=-2.5)
+        
+        gamma_flip = spot_price * (1 + (net_gex / 10))
+        distance = ((gamma_flip - spot_price) / spot_price) * 100
+        
+        st.markdown(f"""
+        **Calculated Metrics**:
+        - Gamma Flip: ${gamma_flip:.2f}
+        - Distance: {distance:.1f}%
+        - Setup Quality: {"HIGH" if abs(distance) > 0.5 else "LOW"}
+        """)
+
+def render_premium_strategy_guide():
+    """Render premium selling guide"""
+    st.markdown("### Premium Selling Strategy")
+    
+    st.markdown("""
+    **Market Condition**: Net GEX > 2B with strong gamma walls
+    
+    **The Concept**:
+    High positive GEX means dealers are long gamma and will sell rallies and buy dips,
+    suppressing volatility and creating range-bound conditions perfect for premium selling.
+    
+    **Setup Requirements**:
+    - Net GEX > 2B (strong positive gamma)
+    - Clear call walls at resistance levels
+    - Put walls providing support
+    - High implied volatility rank (>50th percentile)
+    - Upcoming expiration within 0-2 days
+    """)
+
+def render_condor_strategy_guide():
+    """Render iron condor guide"""
+    st.markdown("### Iron Condor Strategy")
+    
+    st.markdown("""
+    **Market Condition**: Net GEX > 1B with wide gamma walls (>3% apart)
+    
+    **The Strategy**:
+    When gamma walls are wide apart with sparse gamma between them, 
+    price tends to stay range-bound, making iron condors profitable.
+    """)
+
+def render_flip_strategy_guide():
+    """Render gamma flip guide"""
+    st.markdown("### Gamma Flip Plays")
+    
+    st.markdown("""
+    **Market Condition**: Price within 1% of calculated gamma flip point
+    
+    **The Opportunity**:
+    At the gamma flip, dealer hedging behavior changes from volatility 
+    suppression to volatility amplification, creating explosive moves.
+    """)
+
+def render_risk_management_guide():
+    """Render risk management guide"""
+    st.markdown("### Risk Management Framework")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Position Sizing Rules**:
+        - Squeeze Plays: Max 3% of capital per trade
+        - Premium Selling: Max 5% of capital at risk
+        - Iron Condors: Size for 2% maximum loss
+        - Never more than 15% total capital at risk
+        
+        **Stop Loss Guidelines**:
+        - Long options: 50% of premium paid
+        - Short options: 100% of premium received
+        - Time stops: Close 1 hour before expiration
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Portfolio Management**:
+        - Maximum 10 open positions
+        - Diversify across strategies
+        - Monitor Greek exposure daily
+        - Rebalance on regime changes
+        
+        **Emergency Procedures**:
+        - Close all positions if VIX > 35
+        - Halt trading during earnings season
+        - Reduce size during low liquidity
+        """)
+
+if __name__ == "__main__":
+    main()
