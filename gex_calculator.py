@@ -1,39 +1,39 @@
 """
-GEX Calculator - Core gamma exposure calculations
+GEX Calculator - Core Gamma Exposure Calculation Engine
+Handles options data processing and GEX calculations for trading analysis
 """
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple, Union
 from datetime import datetime, timedelta
-import logging
-
-logger = logging.getLogger(__name__)
+import requests
+import json
+import time
 
 class GEXCalculator:
     """
-    Core GEX calculation engine for options market analysis
+    Core Gamma Exposure calculation engine
     """
     
     def __init__(self):
-        self.multiplier = 100  # Standard options multiplier
+        self.multiplier = 100  # Options multiplier
+        self.risk_free_rate = 0.05  # 5% risk-free rate assumption
         
-    def calculate_gamma_exposure(
-        self,
-        options_df: pd.DataFrame,
-        spot_price: float,
-        symbol: str
-    ) -> Dict:
+    def calculate_gamma_exposure(self, 
+                               options_df: pd.DataFrame, 
+                               spot_price: float,
+                               symbol: str) -> Dict:
         """
-        Calculate comprehensive gamma exposure metrics
+        Calculate comprehensive GEX metrics for a symbol
         
         Args:
-            options_df: DataFrame with options data
+            options_df: DataFrame with options chain data
             spot_price: Current underlying price
-            symbol: Symbol being analyzed
+            symbol: Stock/ETF symbol
             
         Returns:
-            Dictionary with GEX analysis results
+            Dictionary with GEX calculations and key levels
         """
         
         try:
@@ -41,66 +41,63 @@ class GEXCalculator:
                 return self._empty_result(symbol, "Empty options data")
             
             # Clean and validate data
-            df = self._clean_options_data(options_df.copy())
-            
+            df = self._clean_options_data(options_df)
             if df.empty:
-                return self._empty_result(symbol, "No valid data after cleaning")
+                return self._empty_result(symbol, "No valid options after cleaning")
             
-            # Calculate individual option GEX
-            df['gex'] = df.apply(
-                lambda row: self._calculate_option_gex(row, spot_price), 
-                axis=1
-            )
+            # Calculate gamma if not present
+            if 'gamma' not in df.columns:
+                df['gamma'] = self._estimate_gamma(df, spot_price)
+            
+            # Calculate GEX for each option
+            df['gex'] = self._calculate_option_gex(df, spot_price)
             
             # Aggregate by strike
-            gex_by_strike = df.groupby('strike')['gex'].sum().sort_index()
+            gex_by_strike = df.groupby('strike').agg({
+                'gex': 'sum',
+                'open_interest': 'sum',
+                'gamma': 'sum'
+            }).reset_index()
             
             # Calculate key metrics
-            results = {
-                'success': True,
+            net_gex = gex_by_strike['gex'].sum()
+            
+            # Find gamma flip point
+            cumulative_gex = gex_by_strike.sort_values('strike')['gex'].cumsum()
+            flip_point = self._find_flip_point(gex_by_strike, spot_price)
+            
+            # Identify walls
+            call_walls = self._find_call_walls(gex_by_strike)
+            put_walls = self._find_put_walls(gex_by_strike)
+            
+            # Calculate distances and levels
+            distance_to_flip = ((spot_price - flip_point) / spot_price) * 100
+            
+            # Determine market regime
+            regime = self._determine_regime(net_gex, distance_to_flip)
+            
+            # Calculate expected move
+            expected_move = self._calculate_expected_move(gex_by_strike, spot_price)
+            
+            return {
                 'symbol': symbol,
+                'timestamp': datetime.now(),
                 'spot_price': spot_price,
-                'calculation_time': datetime.now(),
-                
-                # Core metrics
-                'net_gex': gex_by_strike.sum(),
-                'total_call_gex': df[df['option_type'].str.upper().str.startswith('C')]['gex'].sum(),
-                'total_put_gex': df[df['option_type'].str.upper().str.startswith('P')]['gex'].sum(),
-                
-                # Gamma flip point
-                'gamma_flip_point': self._find_gamma_flip_point(gex_by_strike),
-                
-                # Wall analysis
-                'call_walls': self._find_call_walls(gex_by_strike),
-                'put_walls': self._find_put_walls(gex_by_strike),
-                
-                # Strike-level data
-                'gex_by_strike': gex_by_strike.to_dict(),
-                'strike_count': len(gex_by_strike),
-                'price_range': {
-                    'min_strike': float(gex_by_strike.index.min()),
-                    'max_strike': float(gex_by_strike.index.max())
-                }
+                'net_gex': net_gex,
+                'gamma_flip_point': flip_point,
+                'distance_to_flip': distance_to_flip,
+                'regime': regime,
+                'call_walls': call_walls,
+                'put_walls': put_walls,
+                'expected_move': expected_move,
+                'gex_by_strike': gex_by_strike.to_dict('records'),
+                'total_call_gex': gex_by_strike[gex_by_strike['gex'] > 0]['gex'].sum(),
+                'total_put_gex': gex_by_strike[gex_by_strike['gex'] < 0]['gex'].sum(),
+                'success': True
             }
             
-            # Calculate distance to flip
-            results['distance_to_flip'] = self._calculate_distance_to_flip(
-                spot_price, results['gamma_flip_point']
-            )
-            
-            # Market regime classification
-            results['market_regime'] = self._classify_market_regime(
-                results['net_gex'], results['distance_to_flip']
-            )
-            
-            # Trading setup identification
-            results['setups'] = self._identify_setups(results, df)
-            
-            return results
-            
         except Exception as e:
-            logger.error(f"GEX calculation failed for {symbol}: {e}")
-            return self._empty_result(symbol, str(e))
+            return self._empty_result(symbol, f"Calculation error: {str(e)}")
     
     def _clean_options_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and validate options data"""
@@ -113,202 +110,247 @@ class GEXCalculator:
             raise ValueError(f"Missing required columns: {missing_cols}")
         
         # Convert to numeric
+        df = df.copy()
         df['strike'] = pd.to_numeric(df['strike'], errors='coerce')
         df['open_interest'] = pd.to_numeric(df['open_interest'], errors='coerce')
         
-        # Handle gamma - use if available, otherwise approximate
-        if 'gamma' in df.columns:
-            df['gamma'] = pd.to_numeric(df['gamma'], errors='coerce').fillna(0)
-        else:
-            # Simple gamma approximation for options
-            df['gamma'] = 0.01  # Will be adjusted based on moneyness
+        # Clean option type
+        df['option_type'] = df['option_type'].str.upper()
+        df = df[df['option_type'].isin(['C', 'CALL', 'P', 'PUT'])]
         
-        # Remove invalid rows
+        # Remove invalid data
         df = df.dropna(subset=['strike', 'open_interest'])
-        df = df[df['open_interest'] > 0]  # Only include options with OI
+        df = df[df['open_interest'] > 0]  # Only options with OI
         
         return df
     
-    def _calculate_option_gex(self, row: pd.Series, spot_price: float) -> float:
-        """Calculate GEX for individual option"""
+    def _estimate_gamma(self, df: pd.DataFrame, spot_price: float) -> pd.Series:
+        """Estimate gamma for options using simplified BSM approximation"""
         
-        # Adjust gamma based on moneyness if using approximation
-        if row['gamma'] == 0.01:  # Using approximation
-            # Higher gamma for ATM options, lower for OTM
-            moneyness = abs(row['strike'] - spot_price) / spot_price
-            gamma = 0.01 * np.exp(-2 * moneyness)  # Simplified model
-        else:
-            gamma = row['gamma']
+        # Simplified gamma estimation
+        # Gamma is highest ATM and decreases with distance
+        strikes = df['strike']
         
-        # Base GEX calculation
-        base_gex = spot_price * gamma * row['open_interest'] * self.multiplier
+        # Distance from ATM (normalized)
+        distance = np.abs(strikes - spot_price) / spot_price
         
-        # Calls are positive, puts are negative
-        if row['option_type'].upper().startswith('C'):
-            return base_gex
-        else:
-            return -base_gex
+        # Simplified gamma curve (highest ATM, decreases exponentially)
+        gamma_est = np.exp(-10 * distance**2) * 0.02  # Peak gamma of ~0.02
+        
+        return gamma_est
     
-    def _find_gamma_flip_point(self, gex_by_strike: pd.Series) -> float:
-        """Find the gamma flip point where cumulative GEX crosses zero"""
+    def _calculate_option_gex(self, df: pd.DataFrame, spot_price: float) -> pd.Series:
+        """Calculate GEX for each option"""
         
-        cumulative_gex = gex_by_strike.cumsum()
-        
-        # Find first point where cumulative GEX >= 0
-        positive_points = cumulative_gex[cumulative_gex >= 0]
-        
-        if not positive_points.empty:
-            return float(positive_points.index[0])
-        
-        # If no positive cumulative GEX, return highest strike
-        return float(gex_by_strike.index.max())
-    
-    def _find_call_walls(self, gex_by_strike: pd.Series, top_n: int = 3) -> List[Dict]:
-        """Find strongest call walls (positive GEX concentrations)"""
-        
-        call_gex = gex_by_strike[gex_by_strike > 0].sort_values(ascending=False)
-        
-        walls = []
-        for strike, gex in call_gex.head(top_n).items():
-            walls.append({
-                'strike': float(strike),
-                'gex': float(gex),
-                'strength': 'Strong' if gex > call_gex.quantile(0.8) else 'Moderate'
-            })
-        
-        return walls
-    
-    def _find_put_walls(self, gex_by_strike: pd.Series, top_n: int = 3) -> List[Dict]:
-        """Find strongest put walls (negative GEX concentrations)"""
-        
-        put_gex = gex_by_strike[gex_by_strike < 0].sort_values()
-        
-        walls = []
-        for strike, gex in put_gex.head(top_n).items():
-            walls.append({
-                'strike': float(strike),
-                'gex': float(gex),
-                'strength': 'Strong' if abs(gex) > put_gex.abs().quantile(0.8) else 'Moderate'
-            })
-        
-        return walls
-    
-    def _calculate_distance_to_flip(self, spot_price: float, flip_point: float) -> float:
-        """Calculate percentage distance to gamma flip point"""
-        
-        if flip_point == 0:
-            return 0.0
+        def gex_for_option(row):
+            # GEX = Spot × Gamma × Open Interest × Multiplier
+            base_gex = spot_price * row['gamma'] * row['open_interest'] * self.multiplier
             
-        return ((spot_price - flip_point) / flip_point) * 100
+            # Calls contribute positive GEX, puts negative
+            if row['option_type'] in ['C', 'CALL']:
+                return base_gex
+            else:
+                return -base_gex
+        
+        return df.apply(gex_for_option, axis=1)
     
-    def _classify_market_regime(self, net_gex: float, distance_to_flip: float) -> str:
-        """Classify market regime based on GEX"""
+    def _find_flip_point(self, gex_by_strike: pd.DataFrame, spot_price: float) -> float:
+        """Find gamma flip point where cumulative GEX crosses zero"""
         
-        # Convert to billions for thresholds
-        net_gex_b = net_gex / 1e9
+        sorted_strikes = gex_by_strike.sort_values('strike')
+        cumulative_gex = sorted_strikes['gex'].cumsum()
         
-        if net_gex_b < -1.0:
-            return "NEGATIVE_GEX"
-        elif net_gex_b > 2.0:
-            return "HIGH_POSITIVE_GEX" 
-        elif abs(distance_to_flip) < 0.5:
-            return "NEAR_FLIP"
-        elif net_gex_b > 0:
-            return "POSITIVE_GEX"
+        # Find where cumulative GEX goes from negative to positive
+        for i, (_, row) in enumerate(sorted_strikes.iterrows()):
+            if cumulative_gex.iloc[i] >= 0:
+                return row['strike']
+        
+        # If no flip point found, return spot price
+        return spot_price
+    
+    def _find_call_walls(self, gex_by_strike: pd.DataFrame, top_n: int = 3) -> List[Dict]:
+        """Find top call walls (resistance levels)"""
+        
+        call_gex = gex_by_strike[gex_by_strike['gex'] > 0].copy()
+        call_gex = call_gex.sort_values('gex', ascending=False)
+        
+        walls = []
+        for _, row in call_gex.head(top_n).iterrows():
+            walls.append({
+                'strike': row['strike'],
+                'gex': row['gex'],
+                'open_interest': row['open_interest'],
+                'type': 'resistance'
+            })
+        
+        return walls
+    
+    def _find_put_walls(self, gex_by_strike: pd.DataFrame, top_n: int = 3) -> List[Dict]:
+        """Find top put walls (support levels)"""
+        
+        put_gex = gex_by_strike[gex_by_strike['gex'] < 0].copy()
+        put_gex = put_gex.sort_values('gex', ascending=True)  # Most negative first
+        
+        walls = []
+        for _, row in put_gex.head(top_n).iterrows():
+            walls.append({
+                'strike': row['strike'],
+                'gex': row['gex'],
+                'open_interest': row['open_interest'],
+                'type': 'support'
+            })
+        
+        return walls
+    
+    def _determine_regime(self, net_gex: float, distance_to_flip: float) -> str:
+        """Determine market regime based on GEX"""
+        
+        if net_gex > 1e9:  # > 1B
+            return "High Positive GEX - Volatility Suppression"
+        elif net_gex > 0:
+            return "Positive GEX - Dealer Long Gamma"
+        elif net_gex > -5e8:  # > -500M
+            return "Low Negative GEX - Neutral"
         else:
-            return "NEUTRAL"
+            return "High Negative GEX - Volatility Amplification"
     
-    def _identify_setups(self, gex_results: Dict, options_df: pd.DataFrame) -> List[Dict]:
-        """Identify potential trading setups based on GEX"""
+    def _calculate_expected_move(self, gex_by_strike: pd.DataFrame, spot_price: float) -> Dict:
+        """Calculate expected move based on GEX concentration"""
         
-        setups = []
-        regime = gex_results['market_regime']
-        net_gex = gex_results['net_gex']
-        distance = gex_results['distance_to_flip']
+        # Find strikes with significant GEX concentration
+        significant_gex = gex_by_strike[
+            np.abs(gex_by_strike['gex']) > np.abs(gex_by_strike['gex']).quantile(0.8)
+        ]
         
-        # Negative GEX squeeze setups
-        if regime == "NEGATIVE_GEX":
-            setups.append({
-                'type': 'SQUEEZE_PLAY',
-                'direction': 'LONG_CALLS',
-                'confidence': min(95, 60 + abs(net_gex / 1e8)),
-                'reason': f'Strong negative GEX ({net_gex/1e9:.1f}B) suggests volatility expansion',
-                'target': 'ATM calls 2-5 DTE',
-                'risk': 'High - can lose 100% if no move'
-            })
+        if significant_gex.empty:
+            return {'up': 0, 'down': 0, 'range_pct': 0}
         
-        # High positive GEX resistance
-        elif regime == "HIGH_POSITIVE_GEX":
-            if gex_results['call_walls']:
-                strongest_wall = max(gex_results['call_walls'], key=lambda x: x['gex'])
-                setups.append({
-                    'type': 'RESISTANCE_PLAY',
-                    'direction': 'SHORT_CALLS',
-                    'confidence': min(90, 50 + (net_gex / 1e8) / 10),
-                    'reason': f'High positive GEX with strong call wall at {strongest_wall["strike"]}',
-                    'target': f'Sell calls at/above {strongest_wall["strike"]}',
-                    'risk': 'Moderate - defined by call wall'
-                })
+        max_strike = significant_gex['strike'].max()
+        min_strike = significant_gex['strike'].min()
         
-        # Near flip volatility
-        elif regime == "NEAR_FLIP":
-            setups.append({
-                'type': 'VOLATILITY_PLAY',
-                'direction': 'STRADDLE',
-                'confidence': 70 + (1 - abs(distance)) * 20,
-                'reason': f'Price very close to gamma flip ({distance:.2f}%)',
-                'target': 'ATM straddle or iron butterfly',
-                'risk': 'Moderate - volatility dependent'
-            })
-        
-        return setups
-    
-    def _empty_result(self, symbol: str, error: str) -> Dict:
-        """Return empty result structure for failed calculations"""
+        up_move = ((max_strike - spot_price) / spot_price) * 100
+        down_move = ((spot_price - min_strike) / spot_price) * 100
+        range_pct = ((max_strike - min_strike) / spot_price) * 100
         
         return {
-            'success': False,
+            'up': max(0, up_move),
+            'down': max(0, down_move),
+            'range_pct': range_pct
+        }
+    
+    def _empty_result(self, symbol: str, error: str) -> Dict:
+        """Return empty result structure"""
+        return {
             'symbol': symbol,
+            'timestamp': datetime.now(),
             'error': error,
-            'calculation_time': datetime.now(),
+            'success': False,
+            'spot_price': 0,
             'net_gex': 0,
             'gamma_flip_point': 0,
             'distance_to_flip': 0,
-            'market_regime': 'UNKNOWN',
+            'regime': 'Unknown',
             'call_walls': [],
             'put_walls': [],
-            'setups': []
+            'expected_move': {'up': 0, 'down': 0, 'range_pct': 0},
+            'gex_by_strike': [],
+            'total_call_gex': 0,
+            'total_put_gex': 0
         }
 
-    def calculate_portfolio_gex(self, symbols_data: Dict[str, pd.DataFrame], spot_prices: Dict[str, float]) -> Dict:
-        """Calculate GEX for multiple symbols"""
+class TradingVolatilityAPI:
+    """
+    API client for TradingVolatility.net options data
+    """
+    
+    def __init__(self, username: str = None):
+        self.base_url = "https://stocks.tradingvolatility.net/api"
+        self.username = username
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+        })
+        self.api_calls_made = 0
+        self.last_call_time = 0
+    
+    def fetch_options_data(self, symbol: str) -> Optional[pd.DataFrame]:
+        """Fetch options data with rate limiting and error handling"""
         
-        results = {}
-        summary = {
-            'total_symbols': len(symbols_data),
-            'successful': 0,
-            'failed': 0,
-            'net_portfolio_gex': 0,
-            'regime_distribution': {}
-        }
+        # Rate limiting (2 calls per minute during market hours)
+        current_time = time.time()
+        if current_time - self.last_call_time < 30:  # 30 seconds between calls
+            time.sleep(30 - (current_time - self.last_call_time))
         
-        for symbol, options_df in symbols_data.items():
-            spot_price = spot_prices.get(symbol, options_df['strike'].median())
-            result = self.calculate_gamma_exposure(options_df, spot_price, symbol)
+        url = f"{self.base_url}/options/{symbol.upper()}"
+        
+        try:
+            response = self.session.get(url, timeout=15)
+            self.last_call_time = time.time()
+            self.api_calls_made += 1
             
-            results[symbol] = result
+            if response.status_code != 200:
+                return None
             
-            if result['success']:
-                summary['successful'] += 1
-                summary['net_portfolio_gex'] += result['net_gex']
-                
-                regime = result['market_regime']
-                summary['regime_distribution'][regime] = summary['regime_distribution'].get(regime, 0) + 1
-            else:
-                summary['failed'] += 1
+            # Check for empty or HTML response
+            if not response.text.strip() or response.text.startswith('<'):
+                return None
+            
+            data = response.json()
+            
+            if not isinstance(data, dict) or 'data' not in data:
+                return None
+            
+            options_data = data.get('data', [])
+            if not options_data:
+                return None
+            
+            df = pd.DataFrame(options_data)
+            df['symbol'] = symbol.upper()
+            df['fetch_timestamp'] = datetime.now()
+            
+            return df
+            
+        except Exception as e:
+            print(f"Error fetching {symbol}: {e}")
+            return None
+
+def get_stock_price(symbol: str) -> float:
+    """
+    Get current stock price (placeholder - implement with your preferred data source)
+    """
+    
+    # This is a placeholder - replace with actual price feed
+    # You could use yfinance, Alpha Vantage, IEX, etc.
+    
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(symbol)
+        data = ticker.history(period="1d", interval="1m")
+        if not data.empty:
+            return float(data['Close'].iloc[-1])
+    except:
+        pass
+    
+    # Fallback: estimate from options strikes
+    return 0.0
+
+if __name__ == "__main__":
+    # Example usage
+    calculator = GEXCalculator()
+    api = TradingVolatilityAPI()
+    
+    # Test with SPY
+    print("Testing GEX Calculator with SPY...")
+    options_data = api.fetch_options_data("SPY")
+    
+    if options_data is not None:
+        spot_price = get_stock_price("SPY") or options_data['strike'].median()
+        result = calculator.calculate_gamma_exposure(options_data, spot_price, "SPY")
         
-        return {
-            'results': results,
-            'summary': summary,
-            'calculation_time': datetime.now()
-        }
+        print(f"Net GEX: {result['net_gex']/1e9:.2f}B")
+        print(f"Flip Point: {result['gamma_flip_point']:.2f}")
+        print(f"Distance to Flip: {result['distance_to_flip']:.2f}%")
+        print(f"Regime: {result['regime']}")
+    else:
+        print("Failed to fetch options data")
