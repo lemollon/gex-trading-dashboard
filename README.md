@@ -1,241 +1,311 @@
 # 🚀 GEX Trading System
 
-A comprehensive Gamma Exposure (GEX) analysis platform for identifying high-probability options trading setups based on dealer hedging flows and market microstructure.
+A comprehensive **Gamma Exposure (GEX) trading system** that identifies high-probability options trading setups based on market microstructure analysis. The system analyzes dealer gamma positioning to predict market volatility regimes and identify optimal entry points.
 
-## 🎯 Overview
+## 🎯 What This System Does
 
-This system analyzes options gamma exposure to identify:
-- **Gamma Flip Points**: Where market volatility regime changes
-- **Call Walls**: Resistance levels where dealers must sell
-- **Put Support**: Support levels where dealers must buy  
-- **Squeeze Setups**: High-probability directional moves
-- **Premium Selling Opportunities**: Mean reversion trades
+**Gamma Exposure Analysis**: Calculates how much gamma dealers must hedge across all strikes, identifying:
+- **Negative GEX Zones**: Where dealers are short gamma → volatility expansion expected
+- **Positive GEX Zones**: Where dealers are long gamma → volatility suppression expected  
+- **Gamma Flip Points**: Critical levels where market regime changes
+- **Call/Put Walls**: Major support/resistance levels from option positioning
 
-## 📊 Key Features
+**Trading Setup Identification**: Automatically identifies high-confidence setups:
+- 🎯 **Squeeze Plays**: Long calls/puts in negative GEX environments
+- 💰 **Premium Selling**: Short options at major resistance/support walls
+- ⚖️ **Iron Condors**: Range-bound plays between strong walls
+- ⚡ **Gamma Flip Trades**: Volatility plays near regime transition points
 
-### Core Analytics
-- **Real-time GEX Calculations**: Spot × Gamma × OI × 100
-- **Market Regime Detection**: Positive/Negative gamma environments
-- **Wall Identification**: Key support/resistance from dealer flows
-- **Expected Move Analysis**: Range-bound vs breakout setups
+## 📊 System Architecture
 
-### Trading Strategies
-1. **Negative GEX Squeezes**: Long calls/puts in volatility amplification zones
-2. **Positive GEX Mean Reversion**: Premium selling at walls
-3. **Iron Condors**: Range-bound trades between strong walls
-4. **Gamma Flip Plays**: High volatility around transition points
-
-### Technical Stack
-- **Databricks**: Distributed options data processing
-- **Streamlit**: Interactive trading dashboard
-- **TradingVolatility API**: Real-time options chain data
-- **GitHub**: Version control and CI/CD
-
-## 🛠️ Installation
-
-### Prerequisites
-- Python 3.8+
-- TradingVolatility.net API access
-- (Optional) Databricks workspace for production scaling
-
-### Quick Start
-```bash
-# Clone repository
-git clone https://github.com/yourusername/gex-trading-system.git
-cd gex-trading-system
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run Streamlit dashboard
-streamlit run gex_dashboard.py
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Data Sources  │    │  GEX Calculator  │    │ Setup Identifier│
+│                 │    │                  │    │                 │
+│ • TradingVol    │───▶│ • Gamma Exposure │───▶│ • Squeeze Plays │
+│ • Yahoo Finance │    │ • Flip Points    │    │ • Premium Sell  │
+│ • Polygon.io    │    │ • Call/Put Walls │    │ • Iron Condors  │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │                        │
+                                ▼                        ▼
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Risk Management │    │   Orchestrator   │    │   Streamlit     │
+│                 │    │                  │    │   Dashboard     │
+│ • Position Size │◀───│ • Coordinates    │───▶│                 │
+│ • Portfolio Risk│    │ • Caches Results │    │ • Live Analysis │
+│ • Kelly Sizing  │    │ • Sends Alerts   │    │ • Setup Display │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-### Configuration
-1. **API Setup**: Add your TradingVolatility username to config
-2. **Discord Alerts** (Optional): Add webhook URL for notifications
-3. **Databricks** (Optional): Configure for production data processing
+## 🚀 Quick Start
+
+### 1. Clone and Setup
+```bash
+git clone <your-repo-url>
+cd gex-trading-system
+pip install -r requirements.txt
+```
+
+### 2. Configuration
+Copy and customize the configuration:
+```bash
+cp config.yaml config.local.yaml
+# Edit config.local.yaml with your settings
+```
+
+### 3. Run Analysis
+```python
+from main import GEXTradingOrchestrator
+
+# Initialize system
+orchestrator = GEXTradingOrchestrator()
+
+# Run full analysis
+results = orchestrator.run_full_analysis()
+
+# Or quick scan of priority symbols
+results = orchestrator.get_quick_scan()
+```
+
+### 4. Launch Dashboard
+```bash
+streamlit run gex_dashboard.py
+```
 
 ## 📁 File Structure
 
 ```
 gex-trading-system/
-│
-├── gex_calculator.py      # Core GEX calculation engine
-├── gex_dashboard.py       # Streamlit trading dashboard  
-├── requirements.txt       # Python dependencies
-├── .gitignore            # Git ignore patterns
-├── README.md             # This file
-│
-└── docs/                 # Documentation (optional)
-    ├── trading_guide.md  # Trading strategy documentation
-    └── api_reference.md  # Technical API reference
+├── main.py                 # Main orchestrator
+├── gex_calculator.py       # Core GEX calculations  
+├── data_sources.py         # API integrations
+├── setup_identification.py # Trading setup detection
+├── risk_management.py      # Position sizing & risk
+├── utils.py               # Helper functions
+├── config.yaml            # Configuration
+├── requirements.txt       # Dependencies
+├── gex_dashboard.py       # Streamlit dashboard (you build this)
+└── README.md             # This file
 ```
 
-## 🔧 Usage
+## 🧮 Core GEX Calculations
 
-### Basic GEX Analysis
+### Gamma Exposure Formula
+```
+GEX = Spot Price × Gamma × Open Interest × 100
+```
+
+**For each strike:**
+- **Calls**: Positive GEX (dealers must sell on rallies)
+- **Puts**: Negative GEX (dealers must buy on dips)
+
+### Key Metrics
+- **Net GEX**: Sum of all strikes (market regime indicator)
+- **Gamma Flip Point**: Where cumulative GEX crosses zero
+- **Call Walls**: Highest positive GEX strikes (resistance)
+- **Put Walls**: Highest negative GEX strikes (support)
+
+## 🎯 Trading Strategies
+
+### 1. Squeeze Plays (Negative GEX)
+**When**: Net GEX < -500M, price below flip point
 ```python
-from gex_calculator import GEXCalculator, TradingVolatilityAPI
-
-# Initialize
-calculator = GEXCalculator()
-api = TradingVolatilityAPI(username="your-api-username")
-
-# Analyze a symbol
-options_data = api.fetch_options_data("SPY")
-result = calculator.calculate_gamma_exposure(options_data, spot_price=450, symbol="SPY")
-
-print(f"Net GEX: {result['net_gex']/1e9:.2f}B")
-print(f"Flip Point: {result['gamma_flip_point']:.2f}")
-print(f"Regime: {result['regime']}")
+# Example: SPY negative GEX setup
+{
+    'type': 'SQUEEZE_PLAY',
+    'direction': 'LONG_CALLS', 
+    'confidence': 85,
+    'reason': 'Strong negative GEX (-1.2B) suggests dealer short gamma',
+    'target': 'ATM calls 2-5 DTE'
+}
 ```
 
-### Streamlit Dashboard
+### 2. Premium Selling (High Positive GEX) 
+**When**: Net GEX > 2B, strong walls present
+```python
+# Example: Call selling at resistance
+{
+    'type': 'CALL_SELLING',
+    'direction': 'SHORT_CALLS',
+    'confidence': 78,
+    'reason': 'Strong call wall at 450 with 800M GEX',
+    'target': 'Sell calls at/above wall strikes'
+}
+```
+
+### 3. Iron Condors (Range-Bound)
+**When**: Strong walls 3-15% apart, positive GEX environment
+```python
+# Example: Range trade
+{
+    'type': 'IRON_CONDOR', 
+    'direction': 'NEUTRAL',
+    'confidence': 72,
+    'reason': 'Strong walls at 440 and 460, 4.5% range'
+}
+```
+
+## ⚙️ Configuration
+
+Key configuration sections in `config.yaml`:
+
+### Data Sources
+```yaml
+data_sources:
+  primary: "tradingvolatility"
+  fallback: "yahoo" 
+  cache_duration_hours: 2
+  max_api_calls_per_hour: 100
+```
+
+### Risk Management
+```yaml
+risk_management:
+  max_portfolio_risk: 10.0      # % of portfolio at risk
+  max_single_position: 3.0      # % per position
+  kelly_multiplier: 0.25        # Conservative Kelly sizing
+  max_daily_loss: 2.0          # Daily loss limit %
+```
+
+### Universe
+```yaml
+universe:
+  priority: [SPY, QQQ, IWM, AAPL, MSFT, NVDA]
+  etfs: [SPY, QQQ, IWM, DIA, GLD, SLV]
+  sectors: [XLF, XLE, XLK, XLV, XLI, XLP]
+```
+
+## 🔧 Integration Options
+
+### Databricks Integration
+The system is designed to work with your existing Databricks pipeline:
+```python
+# In Databricks notebook
+from main import GEXTradingOrchestrator
+
+orchestrator = GEXTradingOrchestrator()
+results = orchestrator.run_full_analysis()
+
+# Use results with your existing cells
+interesting_conditions = results['trading_setups']
+```
+
+### Discord Alerts
+Set environment variable and enable in config:
 ```bash
-streamlit run gex_dashboard.py
+export DISCORD_WEBHOOK_URL="your_webhook_url"
 ```
 
-Features:
-- Real-time GEX profiles for 70+ symbols
-- Interactive setup detection
-- Risk management tools
-- Position tracking
-- Discord alert integration
+```yaml
+alerts:
+  discord:
+    enabled: true
+  triggers:
+    high_confidence_setup: 85
+```
 
-## 📈 Trading Strategies
+## 📈 Performance Tracking
 
-### 1. Negative GEX Squeeze (Long Calls)
-**Setup Criteria:**
-- Net GEX < -1B (SPY) or < -500M (QQQ)
-- Price below gamma flip point by 0.5-1.5%
-- Strong put wall support within 1% below
+Built-in performance tracking with metrics:
+- **Win Rate**: Percentage of profitable trades
+- **Sharpe Ratio**: Risk-adjusted returns  
+- **Max Drawdown**: Worst losing streak
+- **Setup Performance**: Win rates by setup type
 
-**Execution:**
-- Buy ATM or 1st OTM calls above flip point
-- Use 2-5 DTE for maximum gamma sensitivity
-- Target: 100% profit | Stop: 50% loss
+```python
+# Access performance metrics
+metrics = orchestrator.performance_tracker.calculate_metrics(period_days=30)
+print(f"Win Rate: {metrics['win_rate']:.1%}")
+print(f"Sharpe Ratio: {metrics['sharpe_ratio']:.2f}")
+```
 
-### 2. Premium Selling at Walls
-**Setup Criteria:**
-- Net GEX > 3B (high positive gamma)
-- Strong call wall with >500M gamma concentration
-- Price between flip and call wall
-
-**Execution:**
-- Sell calls at or above wall strikes
-- Use 0-2 DTE for rapid theta decay
-- Close at 50% profit or if wall breached
-
-### 3. Iron Condors
-**Setup Criteria:**
-- Net GEX > 1B (positive gamma environment)
-- Call and put walls >3% apart
-- Low volatility environment (IV rank <50%)
-
-**Execution:**
-- Short strikes at walls, long strikes beyond
-- Use 5-10 DTE for optimal theta/gamma ratio
-- Manage at 25% profit or threatened strike
-
-## ⚠️ Risk Management
+## 🛡️ Risk Management
 
 ### Position Sizing
-- **Maximum 3% of capital** per directional trade
-- **Maximum 5% of capital** in sold options
-- **Maximum 2% portfolio loss** on iron condors
+- **Kelly Criterion**: Optimal position sizes based on win probability
+- **Risk-Based Sizing**: Adjusted for setup risk level
+- **Portfolio Constraints**: Maximum allocations by strategy type
 
-### Stop Losses
-- **Directional plays**: 50% loss or flip point breach
-- **Premium selling**: 100% loss or wall breach
-- **Iron condors**: Threatened strike or 25% profit
+### Risk Limits
+- **Daily Loss Limits**: Automatic position reduction
+- **Concentration Limits**: Max exposure to single setup type  
+- **Portfolio Risk**: Total capital at risk monitoring
 
-### Time Management
-- **Close positions** with <1 DTE remaining
-- **No new positions** in last 30 minutes
-- **Roll threatened strikes** if >3 DTE remains
+## 🐛 Debugging & Monitoring
 
-## 🔔 Alerts & Monitoring
-
-### High Priority Alerts
-- Net GEX crosses -1B threshold
-- Price within 0.25% of gamma flip
-- Major wall breach
-- 80% of gamma expiring within 1 day
-
-### Discord Integration
+### Health Checks
 ```python
-# Configure webhook in dashboard
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/your-webhook"
+health = orchestrator.health_check()
+print(f"System Status: {health['overall_status']}")
+print(f"Market Open: {health['market_open']}")
 ```
 
-## 📊 Performance Tracking
+### Logging
+Comprehensive logging with configurable levels:
+```yaml
+logging:
+  level: "INFO"
+  file_logging:
+    enabled: true
+    filename: "gex_trading.log"
+```
 
-Monitor these key metrics:
-- **Win rate by setup type**
-- **Average return per trade** 
-- **Maximum drawdown per strategy**
-- **Sharpe ratio by strategy**
-- **Success rate at different GEX levels**
+## 🔮 Usage Examples
 
-## 🔄 API Rate Limits
+### Morning Scan
+```python
+# Quick morning analysis
+results = orchestrator.get_quick_scan(max_symbols=10)
 
-**TradingVolatility.net Limits:**
-- **Weekdays**: 20 calls/minute (non-realtime), 2 calls/minute (realtime)
-- **Weekends**: 2 calls/minute (all endpoints)
+for setup_info in results['trading_setups']:
+    setup = setup_info['setup']
+    if setup.confidence > 80:
+        print(f"{setup.symbol}: {setup.setup_type} - {setup.confidence}%")
+```
 
-The system automatically handles rate limiting with proper delays between calls.
+### Risk Assessment
+```python
+# Check portfolio risk
+risk_check = orchestrator.risk_manager.check_risk_limits(
+    current_positions, 
+    portfolio_value=100000
+)
 
-## 🚀 Production Deployment
+if risk_check['violations']:
+    print(f"Risk violations: {risk_check['violations']}")
+```
 
-### Databricks Setup
-1. Create Databricks workspace
-2. Upload notebook pipeline
-3. Schedule morning scans (7 AM Central)
-4. Configure Delta Lake storage
-
-### Streamlit Cloud
-1. Connect GitHub repository
-2. Add secrets for API keys
-3. Deploy dashboard
-4. Configure custom domain (optional)
+### Alert Integration
+```python
+# Send custom alert
+orchestrator.alert_manager.send_alert(
+    "🔥 SPY showing strong negative GEX - squeeze setup active",
+    alert_type='WARNING'
+)
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
 5. Open Pull Request
+
+## ⚡ Next Steps
+
+Now you're ready to:
+1. **Build your Streamlit dashboard** (`gex_dashboard.py`) using these components
+2. **Integrate with your Databricks pipeline** using the orchestrator
+3. **Customize the configuration** for your specific needs
+4. **Add additional data sources** or trading strategies
+
+The system is designed to be modular - you can use individual components or the full orchestrator based on your needs.
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## ⚠️ Disclaimer
 
-This software is for educational and research purposes only. Options trading involves substantial risk and is not suitable for all investors. Past performance is not indicative of future results. Always consult with a qualified financial advisor before making investment decisions.
-
-## 🆘 Support
-
-- **Issues**: Open a GitHub issue for bugs or feature requests
-- **Discussions**: Use GitHub Discussions for questions
-- **Documentation**: Check the `docs/` folder for detailed guides
-
-## 🎯 Roadmap
-
-### Version 2.0
-- [ ] Machine learning setup detection
-- [ ] Automated paper trading
-- [ ] Advanced backtesting engine
-- [ ] Multi-timeframe analysis
-
-### Version 3.0
-- [ ] Real-time order execution
-- [ ] Portfolio optimization
-- [ ] Risk-adjusted position sizing
-- [ ] Advanced Greeks analysis
-
----
-
-**Built with ❤️ for options traders who understand market microstructure**
+This software is for educational and research purposes only. Options trading involves substantial risk and is not suitable for all investors. Past performance is not indicative of future results. Always consult with a qualified financial advisor before making trading decisions.
