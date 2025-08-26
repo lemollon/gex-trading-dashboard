@@ -1,278 +1,241 @@
-# gex-trading-dashboard
-GEX Trading Dashboard - $100K Mock Account with Databricks Integration
+# 🚀 GEX Trading System
 
+A comprehensive Gamma Exposure (GEX) analysis platform for identifying high-probability options trading setups based on dealer hedging flows and market microstructure.
 
-# 🎯 GEX Trading Strategy Dashboard
+## 🎯 Overview
 
-A comprehensive Streamlit dashboard for **Gamma Exposure (GEX) trading strategies** with integrated **$100K mock trading account** and **Databricks pipeline integration**.
+This system analyzes options gamma exposure to identify:
+- **Gamma Flip Points**: Where market volatility regime changes
+- **Call Walls**: Resistance levels where dealers must sell
+- **Put Support**: Support levels where dealers must buy  
+- **Squeeze Setups**: High-probability directional moves
+- **Premium Selling Opportunities**: Mean reversion trades
 
-## 🌅 Features
+## 📊 Key Features
 
-### 📚 **Educational Strategy Guide**
-- Complete explanation of GEX trading in simple terms
-- Visual examples of gamma flip mechanics
-- 3 main strategies: Squeeze Plays, Premium Selling, Volatility Plays
-- Confidence scoring system (70-100%)
+### Core Analytics
+- **Real-time GEX Calculations**: Spot × Gamma × OI × 100
+- **Market Regime Detection**: Positive/Negative gamma environments
+- **Wall Identification**: Key support/resistance from dealer flows
+- **Expected Move Analysis**: Range-bound vs breakout setups
 
-### 💰 **$100K Mock Trading Account**
-- **Realistic portfolio tracking** with 2% risk per trade
-- **Execute trades** based on morning analysis
-- **Performance analytics** by setup type
-- **Win/loss tracking** with detailed metrics
-- **All data stored in Databricks** for enterprise-grade analytics
+### Trading Strategies
+1. **Negative GEX Squeezes**: Long calls/puts in volatility amplification zones
+2. **Positive GEX Mean Reversion**: Premium selling at walls
+3. **Iron Condors**: Range-bound trades between strong walls
+4. **Gamma Flip Plays**: High volatility around transition points
 
-### 🌅 **Morning Pipeline Integration**
-- **Connects to your ScheduledMorningGEXPipeline** (6:00-8:30 AM Central)
-- **Real opportunities** from your dynamic universe (125+ symbols)
-- **Priority-based rankings** (P1, P2) from your algorithm
-- **Category breakdowns** (Crypto, Biotech, Meme, Weekly Focus)
-- **Live confidence scores** from your analysis
+### Technical Stack
+- **Databricks**: Distributed options data processing
+- **Streamlit**: Interactive trading dashboard
+- **TradingVolatility API**: Real-time options chain data
+- **GitHub**: Version control and CI/CD
 
-### 📊 **Advanced Analytics**
-- Performance by setup type (Squeeze vs Call Selling vs Straddles)
-- Win rate analysis by confidence level
-- Risk-adjusted returns and Sharpe ratios
-- Drawdown monitoring and portfolio optimization
+## 🛠️ Installation
 
-## 🚀 Quick Start
+### Prerequisites
+- Python 3.8+
+- TradingVolatility.net API access
+- (Optional) Databricks workspace for production scaling
 
-### **Option 1: Deploy to Streamlit Cloud (Recommended)**
-
-1. **Fork this repository** to your GitHub account
-
-2. **Go to [share.streamlit.io](https://share.streamlit.io/)**
-
-3. **Click "New app"** and connect your forked repository
-
-4. **Add your Databricks secrets** in the Streamlit Cloud settings:
-   ```toml
-   [secrets]
-   databricks_hostname = "your-workspace.cloud.databricks.com"
-   databricks_http_path = "/sql/1.0/warehouses/your-warehouse-id"
-   databricks_token = "your-databricks-token"
-   ```
-
-5. **Deploy!** Your app will be live at `https://your-app-name.streamlit.app`
-
-### **Option 2: Run Locally**
-
+### Quick Start
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/gex-trading-dashboard.git
-cd gex-trading-dashboard
+# Clone repository
+git clone https://github.com/yourusername/gex-trading-system.git
+cd gex-trading-system
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Create secrets file
-mkdir .streamlit
-echo '[secrets]
-databricks_hostname = "your-workspace.cloud.databricks.com"
-databricks_http_path = "/sql/1.0/warehouses/your-warehouse-id"
-databricks_token = "your-token"' > .streamlit/secrets.toml
-
-# Run the app
+# Run Streamlit dashboard
 streamlit run gex_dashboard.py
 ```
 
-## 🔗 Databricks Integration
+### Configuration
+1. **API Setup**: Add your TradingVolatility username to config
+2. **Discord Alerts** (Optional): Add webhook URL for notifications
+3. **Databricks** (Optional): Configure for production data processing
 
-### **Create Required Tables**
+## 📁 File Structure
 
-Run this SQL in your Databricks workspace:
-
-```sql
--- Table for storing pipeline results
-CREATE TABLE IF NOT EXISTS gex_trading.scheduled_pipeline_results (
-    run_id STRING,
-    analysis_date DATE,
-    analysis_timestamp TIMESTAMP,
-    symbol STRING,
-    spot_price DOUBLE,
-    gamma_flip_point DOUBLE,
-    distance_to_flip DOUBLE,
-    distance_to_flip_pct DOUBLE,
-    structure_type STRING,
-    confidence_score INT,
-    recommendation STRING,
-    category STRING,
-    priority INT,
-    scheduled_analysis BOOLEAN,
-    interval_number INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-) USING DELTA
-PARTITIONED BY (analysis_date);
-
--- Table for mock trading account
-CREATE TABLE IF NOT EXISTS gex_trading.mock_trades (
-    trade_id STRING,
-    user_id STRING DEFAULT 'mock_trader',
-    symbol STRING,
-    trade_type STRING,
-    entry_timestamp TIMESTAMP,
-    entry_price DOUBLE,
-    quantity INT,
-    confidence_score INT,
-    setup_type STRING,
-    recommendation STRING,
-    status STRING DEFAULT 'OPEN',
-    profit_loss DOUBLE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-) USING DELTA
-PARTITIONED BY (DATE(entry_timestamp));
-
--- Table for portfolio tracking
-CREATE TABLE IF NOT EXISTS gex_trading.mock_portfolio_history (
-    portfolio_id STRING,
-    user_id STRING DEFAULT 'mock_trader',
-    snapshot_date DATE,
-    total_value DOUBLE,
-    cash_balance DOUBLE,
-    positions_value DOUBLE,
-    total_return_pct DOUBLE,
-    win_rate DOUBLE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-) USING DELTA
-PARTITIONED BY (snapshot_date);
+```
+gex-trading-system/
+│
+├── gex_calculator.py      # Core GEX calculation engine
+├── gex_dashboard.py       # Streamlit trading dashboard  
+├── requirements.txt       # Python dependencies
+├── .gitignore            # Git ignore patterns
+├── README.md             # This file
+│
+└── docs/                 # Documentation (optional)
+    ├── trading_guide.md  # Trading strategy documentation
+    └── api_reference.md  # Technical API reference
 ```
 
-### **Connect Your ScheduledMorningGEXPipeline**
+## 🔧 Usage
 
-Add this method to your existing pipeline to save results:
-
+### Basic GEX Analysis
 ```python
-def save_opportunity_to_databricks(self, opportunity: Dict, interval_num: int, run_id: str):
-    """Save opportunity to Databricks for Streamlit dashboard"""
-    try:
-        from databricks import sql
-        
-        connection = sql.connect(
-            server_hostname=self.databricks_hostname,
-            http_path=self.databricks_http_path,
-            access_token=self.databricks_token
-        )
-        
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO gex_trading.scheduled_pipeline_results VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                )
-            """, (
-                run_id,
-                datetime.now().date(),
-                datetime.now(),
-                opportunity['symbol'],
-                opportunity['spot_price'],
-                opportunity['gamma_flip_point'],
-                opportunity['distance_to_flip'],
-                opportunity['distance_to_flip_pct'],
-                opportunity['structure_type'],
-                opportunity['confidence_score'],
-                opportunity['recommendation'],
-                opportunity['category'],
-                opportunity['priority'],
-                opportunity['scheduled_analysis'],
-                interval_num,
-                datetime.now()
-            ))
-            
-    except Exception as e:
-        print(f"⚠️ Databricks save error: {e}")
+from gex_calculator import GEXCalculator, TradingVolatilityAPI
+
+# Initialize
+calculator = GEXCalculator()
+api = TradingVolatilityAPI(username="your-api-username")
+
+# Analyze a symbol
+options_data = api.fetch_options_data("SPY")
+result = calculator.calculate_gamma_exposure(options_data, spot_price=450, symbol="SPY")
+
+print(f"Net GEX: {result['net_gex']/1e9:.2f}B")
+print(f"Flip Point: {result['gamma_flip_point']:.2f}")
+print(f"Regime: {result['regime']}")
 ```
 
-## 📊 Dashboard Pages
-
-### **🎓 Learn the Strategy**
-- Complete GEX trading education
-- Market maker psychology explained
-- Visual examples with real scenarios
-- Why the strategies work
-
-### **🌅 Morning Analysis**  
-- Live opportunities from your 6AM-8:30AM pipeline
-- Priority-ranked picks with confidence scores
-- Interactive gamma flip visualization
-- Category-based filtering
-
-### **💰 Mock Trading Account**
-- $100K starting balance
-- Execute trades with proper position sizing
-- Real-time P&L tracking
-- Performance analytics dashboard
-
-### **📊 Performance Tracking**
-- Win rates by setup type
-- Average returns per trade category
-- Risk-adjusted performance metrics
-- Historical portfolio value charts
-
-## 🎯 Strategy Overview
-
-### **🚀 Squeeze Plays (Long Calls)**
-- **When:** Price below gamma flip point
-- **Why:** Market makers buy when price rises → explosive moves
-- **Target:** 100%+ returns on momentum
-
-### **💰 Premium Selling (Sell Calls)**  
-- **When:** Price above gamma flip point
-- **Why:** Market makers sell when price rises → resistance
-- **Target:** 50% premium collection
-
-### **⚖️ Volatility Plays (Straddles)**
-- **When:** Price at gamma flip point  
-- **Why:** Maximum uncertainty → big moves either direction
-- **Target:** Profit from volatility expansion
-
-## 🔐 Security
-
-- All sensitive data stored in Streamlit secrets
-- Databricks tokens use personal access tokens (not passwords)
-- No hardcoded credentials in code
-- Environment-specific configuration
-
-## 📈 Performance Tracking
-
-The dashboard tracks:
-- **Win Rate** by setup type and confidence level
-- **Average Return** per trade category  
-- **Risk Metrics** including maximum drawdown
-- **Hold Period Analysis** for optimal timing
-- **Category Performance** (Crypto vs Biotech vs Meme stocks)
-
-## 🛠️ Development
-
-### **Project Structure**
-```
-gex-trading-dashboard/
-├── gex_dashboard.py          # Main Streamlit application
-├── requirements.txt          # Python dependencies
-├── README.md                # This file
-├── .streamlit/
-│   └── secrets.toml         # Local secrets (not committed)
-└── .gitignore               # Git ignore file
+### Streamlit Dashboard
+```bash
+streamlit run gex_dashboard.py
 ```
 
-### **Contributing**
+Features:
+- Real-time GEX profiles for 70+ symbols
+- Interactive setup detection
+- Risk management tools
+- Position tracking
+- Discord alert integration
+
+## 📈 Trading Strategies
+
+### 1. Negative GEX Squeeze (Long Calls)
+**Setup Criteria:**
+- Net GEX < -1B (SPY) or < -500M (QQQ)
+- Price below gamma flip point by 0.5-1.5%
+- Strong put wall support within 1% below
+
+**Execution:**
+- Buy ATM or 1st OTM calls above flip point
+- Use 2-5 DTE for maximum gamma sensitivity
+- Target: 100% profit | Stop: 50% loss
+
+### 2. Premium Selling at Walls
+**Setup Criteria:**
+- Net GEX > 3B (high positive gamma)
+- Strong call wall with >500M gamma concentration
+- Price between flip and call wall
+
+**Execution:**
+- Sell calls at or above wall strikes
+- Use 0-2 DTE for rapid theta decay
+- Close at 50% profit or if wall breached
+
+### 3. Iron Condors
+**Setup Criteria:**
+- Net GEX > 1B (positive gamma environment)
+- Call and put walls >3% apart
+- Low volatility environment (IV rank <50%)
+
+**Execution:**
+- Short strikes at walls, long strikes beyond
+- Use 5-10 DTE for optimal theta/gamma ratio
+- Manage at 25% profit or threatened strike
+
+## ⚠️ Risk Management
+
+### Position Sizing
+- **Maximum 3% of capital** per directional trade
+- **Maximum 5% of capital** in sold options
+- **Maximum 2% portfolio loss** on iron condors
+
+### Stop Losses
+- **Directional plays**: 50% loss or flip point breach
+- **Premium selling**: 100% loss or wall breach
+- **Iron condors**: Threatened strike or 25% profit
+
+### Time Management
+- **Close positions** with <1 DTE remaining
+- **No new positions** in last 30 minutes
+- **Roll threatened strikes** if >3 DTE remains
+
+## 🔔 Alerts & Monitoring
+
+### High Priority Alerts
+- Net GEX crosses -1B threshold
+- Price within 0.25% of gamma flip
+- Major wall breach
+- 80% of gamma expiring within 1 day
+
+### Discord Integration
+```python
+# Configure webhook in dashboard
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/your-webhook"
+```
+
+## 📊 Performance Tracking
+
+Monitor these key metrics:
+- **Win rate by setup type**
+- **Average return per trade** 
+- **Maximum drawdown per strategy**
+- **Sharpe ratio by strategy**
+- **Success rate at different GEX levels**
+
+## 🔄 API Rate Limits
+
+**TradingVolatility.net Limits:**
+- **Weekdays**: 20 calls/minute (non-realtime), 2 calls/minute (realtime)
+- **Weekends**: 2 calls/minute (all endpoints)
+
+The system automatically handles rate limiting with proper delays between calls.
+
+## 🚀 Production Deployment
+
+### Databricks Setup
+1. Create Databricks workspace
+2. Upload notebook pipeline
+3. Schedule morning scans (7 AM Central)
+4. Configure Delta Lake storage
+
+### Streamlit Cloud
+1. Connect GitHub repository
+2. Add secrets for API keys
+3. Deploy dashboard
+4. Configure custom domain (optional)
+
+## 🤝 Contributing
+
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test locally
-5. Submit a pull request
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-## 📞 Support
+## 📝 License
 
-- **Strategy Questions:** Refer to the "Learn the Strategy" tab in the app
-- **Technical Issues:** Check the Databricks Integration Guide in the app
-- **Pipeline Integration:** Follow the step-by-step setup guide
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🎯 Next Steps
+## ⚠️ Disclaimer
 
-1. **Deploy to Streamlit Cloud** for permanent access
-2. **Connect your Databricks pipeline** for real data
-3. **Start mock trading** with the $100K account
-4. **Track performance** and refine strategies
-5. **Scale to real trading** once comfortable with results
+This software is for educational and research purposes only. Options trading involves substantial risk and is not suitable for all investors. Past performance is not indicative of future results. Always consult with a qualified financial advisor before making investment decisions.
+
+## 🆘 Support
+
+- **Issues**: Open a GitHub issue for bugs or feature requests
+- **Discussions**: Use GitHub Discussions for questions
+- **Documentation**: Check the `docs/` folder for detailed guides
+
+## 🎯 Roadmap
+
+### Version 2.0
+- [ ] Machine learning setup detection
+- [ ] Automated paper trading
+- [ ] Advanced backtesting engine
+- [ ] Multi-timeframe analysis
+
+### Version 3.0
+- [ ] Real-time order execution
+- [ ] Portfolio optimization
+- [ ] Risk-adjusted position sizing
+- [ ] Advanced Greeks analysis
 
 ---
 
-**🚀 Turn market maker psychology into profits with quantified GEX analysis!**
+**Built with ❤️ for options traders who understand market microstructure**
