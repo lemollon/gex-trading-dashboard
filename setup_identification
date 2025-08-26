@@ -1,0 +1,462 @@
+"""
+Setup Identification - Identify trading opportunities from GEX analysis
+"""
+
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime, timedelta
+from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class TradingSetup:
+    """Trading setup data structure"""
+    symbol: str
+    setup_type: str
+    direction: str
+    confidence: float
+    entry_price: float
+    target_price: Optional[float]
+    stop_price: Optional[float]
+    size_percentage: float
+    hold_days: int
+    reason: str
+    risk_level: str
+    expected_move: float
+    setup_time: datetime
+
+class SetupIdentifier:
+    """
+    Identify high-probability trading setups from GEX analysis
+    """
+    
+    def __init__(self, config: Dict = None):
+        self.config = config or self._default_config()
+        
+    def _default_config(self) -> Dict:
+        """Default configuration for setup identification"""
+        return {
+            # GEX thresholds (in billions)
+            'negative_gex_threshold': -0.5,
+            'high_positive_gex_threshold': 2.0,
+            'flip_proximity_threshold': 0.5,
+            
+            # Confidence scoring
+            'base_confidence': 50,
+            'max_confidence': 95,
+            'confidence_boost_per_billion': 10,
+            
+            # Position sizing
+            'max_position_size': 3.0,  # % of portfolio
+            'squeeze_play_size': 2.0,
+            'premium_sell_size': 5.0,
+            'neutral_play_size': 2.5,
+            
+            # Risk management
+            'max_hold_days': 7,
+            'profit_target_multiplier': 2.0,
+            'stop_loss_percentage': 50.0
+        }
+    
+    def identify_setups(
+        self,
+        gex_results: Dict,
+        market_data: Dict,
+        volume_data: Dict = None
+    ) -> List[TradingSetup]:
+        """
+        Identify all possible setups for a symbol
+        
+        Args:
+            gex_results: Results from GEX calculation
+            market_data: Current market data (price, volume, etc.)
+            volume_data: Volume analysis data
+            
+        Returns:
+            List of TradingSetup objects
+        """
+        
+        setups = []
+        
+        if not gex_results.get('success'):
+            return setups
+        
+        symbol = gex_results['symbol']
+        net_gex = gex_results['net_gex']
+        distance_to_flip = gex_results['distance_to_flip']
+        regime = gex_results['market_regime']
+        spot_price = market_data.get('price', gex_results['spot_price'])
+        
+        # 1. Squeeze Plays (Negative GEX)
+        squeeze_setups = self._identify_squeeze_plays(
+            symbol, net_gex, distance_to_flip, spot_price, gex_results
+        )
+        setups.extend(squeeze_setups)
+        
+        # 2. Premium Selling (High Positive GEX)
+        premium_setups = self._identify_premium_selling(
+            symbol, net_gex, gex_results, spot_price
+        )
+        setups.extend(premium_setups)
+        
+        # 3. Iron Condor Setups
+        condor_setups = self._identify_iron_condors(
+            symbol, gex_results, spot_price
+        )
+        setups.extend(condor_setups)
+        
+        # 4. Gamma Flip Trades
+        flip_setups = self._identify_flip_trades(
+            symbol, distance_to_flip, net_gex, spot_price, gex_results
+        )
+        setups.extend(flip_setups)
+        
+        # 5. Volume-based enhancements
+        if volume_data:
+            setups = self._enhance_with_volume(setups, volume_data)
+        
+        # Sort by confidence
+        setups.sort(key=lambda x: x.confidence, reverse=True)
+        
+        return setups
+    
+    def _identify_squeeze_plays(
+        self,
+        symbol: str,
+        net_gex: float,
+        distance_to_flip: float,
+        spot_price: float,
+        gex_results: Dict
+    ) -> List[TradingSetup]:
+        """Identify squeeze play opportunities"""
+        
+        setups = []
+        net_gex_b = net_gex / 1e9
+        
+        # Negative GEX Long Call Squeeze
+        if net_gex_b < self.config['negative_gex_threshold']:
+            
+            confidence = min(
+                self.config['max_confidence'],
+                self.config['base_confidence'] + abs(net_gex_b) * self.config['confidence_boost_per_billion']
+            )
+            
+            # Boost confidence if price is below flip point
+            if distance_to_flip < -0.5:
+                confidence += 15
+            
+            # Look for put support
+            put_support = None
+            if gex_results['put_walls']:
+                strongest_put = max(gex_results['put_walls'], key=lambda x: abs(x['gex']))
+                if strongest_put['strike'] < spot_price * 0.98:  # Support below current price
+                    put_support = strongest_put['strike']
+                    confidence += 10
+            
+            expected_move = abs(net_gex_b) * 0.02  # Rough estimate
+            
+            setup = TradingSetup(
+                symbol=symbol,
+                setup_type='SQUEEZE_PLAY',
+                direction='LONG_CALLS',
+                confidence=confidence,
+                entry_price=spot_price,
+                target_price=spot_price * (1 + expected_move),
+                stop_price=put_support or spot_price * 0.95,
+                size_percentage=self.config['squeeze_play_size'],
+                hold_days=min(5, self.config['max_hold_days']),
+                reason=f'Strong negative GEX ({net_gex_b:.1f}B) suggests dealer short gamma, expecting volatility expansion',
+                risk_level='HIGH',
+                expected_move=expected_move,
+                setup_time=datetime.now()
+            )
+            
+            setups.append(setup)
+        
+        # Positive GEX Breakdown (Long Puts)
+        elif net_gex_b > self.config['high_positive_gex_threshold'] and distance_to_flip < 0.5:
+            
+            confidence = min(
+                self.config['max_confidence'],
+                self.config['base_confidence'] + (net_gex_b / 2) * self.config['confidence_boost_per_billion']
+            )
+            
+            # Look for call wall resistance
+            call_resistance = None
+            if gex_results['call_walls']:
+                strongest_call = max(gex_results['call_walls'], key=lambda x: x['gex'])
+                if strongest_call['strike'] > spot_price * 1.02:  # Resistance above
+                    call_resistance = strongest_call['strike']
+                    confidence += 10
+            
+            expected_move = min(0.05, net_gex_b * 0.01)
+            
+            setup = TradingSetup(
+                symbol=symbol,
+                setup_type='BREAKDOWN_PLAY',
+                direction='LONG_PUTS',
+                confidence=confidence,
+                entry_price=spot_price,
+                target_price=spot_price * (1 - expected_move),
+                stop_price=call_resistance or spot_price * 1.05,
+                size_percentage=self.config['squeeze_play_size'],
+                hold_days=min(7, self.config['max_hold_days']),
+                reason=f'High positive GEX ({net_gex_b:.1f}B) with price near resistance, expecting breakdown',
+                risk_level='MEDIUM',
+                expected_move=expected_move,
+                setup_time=datetime.now()
+            )
+            
+            setups.append(setup)
+        
+        return setups
+    
+    def _identify_premium_selling(
+        self,
+        symbol: str,
+        net_gex: float,
+        gex_results: Dict,
+        spot_price: float
+    ) -> List[TradingSetup]:
+        """Identify premium selling opportunities"""
+        
+        setups = []
+        net_gex_b = net_gex / 1e9
+        
+        # Only in high positive GEX environments
+        if net_gex_b < 1.0:
+            return setups
+        
+        # Call selling at resistance
+        if gex_results['call_walls']:
+            for wall in gex_results['call_walls']:
+                if wall['strike'] > spot_price * 1.01:  # Above current price
+                    
+                    confidence = min(
+                        85,
+                        60 + (net_gex_b * 5) + (wall['gex'] / 1e8)
+                    )
+                    
+                    setup = TradingSetup(
+                        symbol=symbol,
+                        setup_type='CALL_SELLING',
+                        direction='SHORT_CALLS',
+                        confidence=confidence,
+                        entry_price=wall['strike'],
+                        target_price=None,  # Premium collection
+                        stop_price=wall['strike'] * 1.05,
+                        size_percentage=self.config['premium_sell_size'],
+                        hold_days=min(3, self.config['max_hold_days']),
+                        reason=f'Strong call wall at {wall["strike"]} with {wall["gex"]/1e6:.0f}M GEX',
+                        risk_level='MEDIUM',
+                        expected_move=0.02,
+                        setup_time=datetime.now()
+                    )
+                    
+                    setups.append(setup)
+                    break  # Only strongest wall
+        
+        # Put selling at support
+        if gex_results['put_walls']:
+            for wall in gex_results['put_walls']:
+                if wall['strike'] < spot_price * 0.99:  # Below current price
+                    
+                    confidence = min(
+                        80,
+                        55 + (net_gex_b * 5) + (abs(wall['gex']) / 1e8)
+                    )
+                    
+                    setup = TradingSetup(
+                        symbol=symbol,
+                        setup_type='PUT_SELLING',
+                        direction='SHORT_PUTS',
+                        confidence=confidence,
+                        entry_price=wall['strike'],
+                        target_price=None,  # Premium collection
+                        stop_price=wall['strike'] * 0.95,
+                        size_percentage=self.config['premium_sell_size'],
+                        hold_days=min(5, self.config['max_hold_days']),
+                        reason=f'Strong put wall at {wall["strike"]} with {abs(wall["gex"])/1e6:.0f}M GEX',
+                        risk_level='MEDIUM',
+                        expected_move=0.02,
+                        setup_time=datetime.now()
+                    )
+                    
+                    setups.append(setup)
+                    break  # Only strongest wall
+        
+        return setups
+    
+    def _identify_iron_condors(
+        self,
+        symbol: str,
+        gex_results: Dict,
+        spot_price: float
+    ) -> List[TradingSetup]:
+        """Identify iron condor opportunities"""
+        
+        setups = []
+        
+        # Need both call and put walls
+        if not (gex_results['call_walls'] and gex_results['put_walls']):
+            return setups
+        
+        strongest_call = max(gex_results['call_walls'], key=lambda x: x['gex'])
+        strongest_put = min(gex_results['put_walls'], key=lambda x: x['gex'])
+        
+        call_strike = strongest_call['strike']
+        put_strike = strongest_put['strike']
+        
+        # Check if walls are appropriately spaced
+        wall_distance = (call_strike - put_strike) / spot_price
+        
+        if 0.03 < wall_distance < 0.15:  # 3% to 15% apart
+            
+            # Price should be between walls
+            if put_strike < spot_price < call_strike:
+                
+                confidence = min(
+                    75,
+                    40 + (strongest_call['gex'] / 1e8) + (abs(strongest_put['gex']) / 1e8)
+                )
+                
+                setup = TradingSetup(
+                    symbol=symbol,
+                    setup_type='IRON_CONDOR',
+                    direction='NEUTRAL',
+                    confidence=confidence,
+                    entry_price=spot_price,
+                    target_price=spot_price,  # Stay in range
+                    stop_price=None,  # Managed by strikes
+                    size_percentage=self.config['neutral_play_size'],
+                    hold_days=self.config['max_hold_days'],
+                    reason=f'Strong walls at {put_strike} and {call_strike}, {wall_distance*100:.1f}% range',
+                    risk_level='LOW',
+                    expected_move=wall_distance / 2,
+                    setup_time=datetime.now()
+                )
+                
+                setups.append(setup)
+        
+        return setups
+    
+    def _identify_flip_trades(
+        self,
+        symbol: str,
+        distance_to_flip: float,
+        net_gex: float,
+        spot_price: float,
+        gex_results: Dict
+    ) -> List[TradingSetup]:
+        """Identify gamma flip-based trades"""
+        
+        setups = []
+        
+        # Very close to flip point
+        if abs(distance_to_flip) < self.config['flip_proximity_threshold']:
+            
+            flip_point = gex_results['gamma_flip_point']
+            
+            confidence = min(
+                80,
+                60 + (self.config['flip_proximity_threshold'] - abs(distance_to_flip)) * 40
+            )
+            
+            # Volatility play - expect movement in either direction
+            setup = TradingSetup(
+                symbol=symbol,
+                setup_type='GAMMA_FLIP',
+                direction='VOLATILITY',
+                confidence=confidence,
+                entry_price=spot_price,
+                target_price=None,  # Directional movement
+                stop_price=None,  # Time-based exit
+                size_percentage=self.config['neutral_play_size'],
+                hold_days=3,  # Short hold for volatility
+                reason=f'Price {distance_to_flip:.2f}% from gamma flip point at {flip_point:.2f}',
+                risk_level='MEDIUM',
+                expected_move=0.03,  # Expect 3% move
+                setup_time=datetime.now()
+            )
+            
+            setups.append(setup)
+        
+        return setups
+    
+    def _enhance_with_volume(
+        self,
+        setups: List[TradingSetup],
+        volume_data: Dict
+    ) -> List[TradingSetup]:
+        """Enhance setups with volume analysis"""
+        
+        volume_ratio = volume_data.get('volume_ratio', 1.0)
+        
+        for setup in setups:
+            # Boost confidence for unusual volume
+            if volume_ratio > 2.0:
+                setup.confidence = min(95, setup.confidence + 15)
+                setup.reason += f" + unusual volume ({volume_ratio:.1f}x avg)"
+            elif volume_ratio > 1.5:
+                setup.confidence = min(95, setup.confidence + 10)
+                setup.reason += f" + elevated volume ({volume_ratio:.1f}x avg)"
+        
+        return setups
+    
+    def filter_setups(
+        self,
+        setups: List[TradingSetup],
+        min_confidence: float = 60,
+        max_risk_level: str = 'HIGH'
+    ) -> List[TradingSetup]:
+        """Filter setups by confidence and risk criteria"""
+        
+        risk_levels = {'LOW': 1, 'MEDIUM': 2, 'HIGH': 3}
+        max_risk_num = risk_levels.get(max_risk_level, 3)
+        
+        filtered = []
+        for setup in setups:
+            if (setup.confidence >= min_confidence and 
+                risk_levels.get(setup.risk_level, 3) <= max_risk_num):
+                filtered.append(setup)
+        
+        return filtered
+    
+    def calculate_portfolio_allocation(
+        self,
+        setups: List[TradingSetup],
+        max_total_allocation: float = 25.0
+    ) -> Dict[str, float]:
+        """Calculate optimal portfolio allocation across setups"""
+        
+        if not setups:
+            return {}
+        
+        # Weight by confidence
+        total_confidence = sum(setup.confidence for setup in setups)
+        allocations = {}
+        
+        remaining_allocation = max_total_allocation
+        
+        for setup in setups:
+            if remaining_allocation <= 0:
+                break
+                
+            # Base allocation from confidence weighting
+            confidence_weight = setup.confidence / total_confidence
+            suggested_allocation = confidence_weight * max_total_allocation
+            
+            # Cap by setup's max size and remaining allocation
+            actual_allocation = min(
+                suggested_allocation,
+                setup.size_percentage,
+                remaining_allocation
+            )
+            
+            allocations[f"{setup.symbol}_{setup.setup_type}"] = actual_allocation
+            remaining_allocation -= actual_allocation
+        
+        return allocations
