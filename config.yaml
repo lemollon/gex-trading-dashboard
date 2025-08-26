@@ -1,0 +1,51 @@
+# GEX Trading System Configuration
+
+# Application Settings
+app:
+  name: "GEX Trading Dashboard"
+  version: "1.0.0"
+  debug: false
+  timezone: "US/Central"
+
+# Data Sources
+data_sources:
+  primary: "tradingvolatility"  # tradingvolatility, yahoo, polygon
+  fallback: "yahoo"
+  cache_duration_hours: 2
+  max_api_calls_per_hour: 100
+  
+  # API Configuration
+  tradingvolatility:
+    base_url: "https://stocks.tradingvolatility.net/api"
+    timeout: 15
+    max_retries: 3
+    
+  yahoo:
+    max_expirations: 3
+    timeout: 10
+    
+  polygon:
+    base_url: "https://api.polygon.io"
+    # api_key: set via environment variable POLYGON_API_KEY
+
+# Universe Configuration
+universe:
+  # ETFs
+  etfs:
+    - SPY
+    - QQQ
+    - IWM
+    - DIA
+    - VTI
+    - EFA
+    - GLD
+    - SLV
+    - TLT
+    - HYG
+    
+  # Sector ETFs
+  sectors:
+    - XLF  # Financial
+    - XLE  # Energy
+    - XLK  # Technology
+    - XLV
