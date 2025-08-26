@@ -1,6 +1,9 @@
 """
-🚀 GEX Trading Dashboard - Live Databricks Integration
-Beautiful, informative dashboard connected to your real pipeline data
+GEX Trading Dashboard - Complete Gamma Exposure Analysis Platform
+Author: GEX Trading System Expert
+Version: 3.0.0
+Description: Comprehensive dashboard for gamma exposure analysis, trade setup detection,
+             and position management with TradingVolatility API integration
 """
 
 import streamlit as st
@@ -9,971 +12,1005 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta
-import time
+import yfinance as yf
+from datetime import datetime, timedelta, time
+import pytz
+import warnings
 import json
+import time as time_module
+import requests
+from typing import Dict, List, Tuple, Optional
+import logging
+from dataclasses import dataclass, field
+import sqlite3
+import hashlib
+from functools import lru_cache
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 
-# Page config
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Suppress warnings
+warnings.filterwarnings('ignore')
+
+# Page configuration
 st.set_page_config(
-    page_title="GEX Trading Command Center",
+    page_title="GEX Trading Dashboard - Professional",
     page_icon="🚀",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Stunning CSS with enhanced visuals
+# ======================== CUSTOM CSS ========================
+
 st.markdown("""
 <style>
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* Main background with animated gradient */
-    .main {
-        background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
-        background-size: 400% 400%;
-        animation: gradientShift 15s ease infinite;
-        color: white;
-        min-height: 100vh;
+    * {
+        font-family: 'Inter', sans-serif;
     }
     
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
     }
     
-    /* Hero section with glassmorphism */
-    .hero-container {
-        background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.4));
-        border-radius: 20px;
-        padding: 2.5rem;
-        margin-bottom: 2rem;
-        border: 1px solid rgba(255,255,255,0.2);
-        backdrop-filter: blur(20px);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    }
-    
-    /* Premium metric cards */
-    .metric-card {
-        background: linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
-        border-radius: 20px;
-        padding: 2rem;
-        margin: 1rem;
-        border: 1px solid rgba(255,255,255,0.2);
-        backdrop-filter: blur(15px);
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        text-align: center;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .metric-card:before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-        transition: left 0.5s;
-    }
-    
-    .metric-card:hover:before {
-        left: 100%;
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-10px) scale(1.02);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        border-color: rgba(255,255,255,0.4);
-    }
-    
-    /* Enhanced setup cards */
-    .setup-card {
-        background: linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        border-left: 5px solid;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .setup-card:hover {
-        transform: translateX(8px);
-        background: linear-gradient(145deg, rgba(255,255,255,0.25), rgba(255,255,255,0.15));
-        box-shadow: 0 15px 35px rgba(0,0,0,0.3);
-    }
-    
-    /* Confidence-based styling */
-    .confidence-high { 
-        border-left-color: #00ff88;
-        box-shadow: 0 0 20px rgba(0,255,136,0.3);
-    }
-    .confidence-medium { 
-        border-left-color: #ffaa00;
-        box-shadow: 0 0 20px rgba(255,170,0,0.3);
-    }
-    .confidence-low { 
-        border-left-color: #ff4444;
-        box-shadow: 0 0 20px rgba(255,68,68,0.3);
-    }
-    
-    /* Animated status indicators */
-    .status-indicator {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        margin-right: 10px;
-        animation: pulse 2s infinite;
-        box-shadow: 0 0 10px currentColor;
-    }
-    
-    .status-live { 
-        background: linear-gradient(45deg, #00ff88, #00cc70);
-        animation: livePulse 2s infinite;
-    }
-    .status-error { 
-        background: linear-gradient(45deg, #ff4444, #cc3333);
-        animation: errorPulse 1s infinite;
-    }
-    
-    @keyframes livePulse {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.7; transform: scale(1.1); }
-    }
-    
-    @keyframes errorPulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.4; }
-    }
-    
-    /* Typography enhancements */
-    .big-number {
-        font-size: 3rem;
-        font-weight: 800;
-        line-height: 1;
-        text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        background: linear-gradient(45deg, #ffffff, #f0f0f0);
+    h1, h2, h3 {
+        background: linear-gradient(120deg, #00D2FF 0%, #3A7BD5 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    
-    .setup-title {
-        font-size: 1.2rem;
         font-weight: 700;
-        margin-bottom: 0.8rem;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
     
-    /* Error and loading containers */
-    .error-container {
-        background: linear-gradient(145deg, rgba(255,68,68,0.2), rgba(255,68,68,0.1));
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 2rem 0;
-        border: 2px solid rgba(255,68,68,0.4);
-        text-align: center;
+    .metric-card {
+        background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
     }
     
-    .loading-container {
-        background: linear-gradient(145deg, rgba(255,170,0,0.2), rgba(255,170,0,0.1));
-        border-radius: 16px;
-        padding: 2rem;
-        margin: 2rem 0;
-        border: 2px solid rgba(255,170,0,0.4);
-        text-align: center;
-        backdrop-filter: blur(10px);
-    }
-    
-    .success-container {
-        background: linear-gradient(145deg, rgba(0,255,136,0.2), rgba(0,255,136,0.1));
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        border: 2px solid rgba(0,255,136,0.4);
-        backdrop-filter: blur(10px);
-    }
-    
-    /* Button enhancements */
-    .stButton > button {
-        background: linear-gradient(45deg, #667eea, #764ba2);
+    .trade-setup {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 15px;
+        margin: 15px 0;
+        border-left: 5px solid #00ff87;
         color: white;
-        border: none;
-        border-radius: 12px;
-        padding: 0.75rem 1.5rem;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
     }
     
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+    .success-alert {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
     }
     
-    /* Performance metrics styling */
-    .perf-metric {
-        background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-left: 3px solid #00aaff;
-        backdrop-filter: blur(5px);
+    .warning-alert {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        color: #333;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
     }
     
-    /* Chart container */
-    .chart-container {
-        background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-        border-radius: 16px;
-        padding: 1rem;
+    .danger-alert {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+    
+    .stSidebar {
+        background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+    }
+    
+    .valid-symbol {
+        color: #00ff87;
+        font-weight: bold;
+    }
+    
+    .invalid-symbol {
+        color: #ff6b6b;
+        font-weight: bold;
+    }
+    
+    div[data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(10px);
-        border: 1px solid rgba(255,255,255,0.2);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 15px;
+        border-radius: 15px;
+        margin: 10px 0;
+    }
+    
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Databricks connection
-@st.cache_resource
-def init_databricks_connection():
-    """Initialize Databricks connection"""
-    try:
-        from databricks import sql
-        return True
-    except ImportError:
-        st.error("📦 Install databricks-sql-connector: pip install databricks-sql-connector")
-        return False
+# ======================== SESSION STATE INITIALIZATION ========================
 
-@st.cache_data(ttl=180)  # Cache for 3 minutes - fresher data
-def load_live_databricks_data():
-    """Load live data from your Databricks pipeline"""
-    
-    try:
-        from databricks import sql
-        
-        # Connect using your secrets
-        connection = sql.connect(
-            server_hostname=st.secrets["databricks"]["server_hostname"],
-            http_path=st.secrets["databricks"]["http_path"], 
-            access_token=st.secrets["databricks"]["access_token"]
-        )
-        
-        cursor = connection.cursor()
-        
-        # Query your pipeline results - last 7 days
-        query = """
-        SELECT *
-        FROM quant_projects.gex_trading.gex_pipeline_results
-        WHERE pipeline_date >= current_date() - INTERVAL 7 DAYS
-        ORDER BY run_timestamp DESC
-        LIMIT 200
-        """
-        
-        cursor.execute(query)
-        results = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        
-        cursor.close()
-        connection.close()
-        
-        if not results:
-            return create_empty_response(), "Connected but no recent data"
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(results, columns=columns)
-        
-        # Get latest run
-        latest_run_id = df['run_id'].iloc[0]
-        latest_data = df[df['run_id'] == latest_run_id]
-        
-        # Convert to dashboard format
-        dashboard_data = convert_databricks_to_dashboard_format(latest_data, df)
-        
-        return dashboard_data, "Live from Databricks"
-        
-    except Exception as e:
-        st.error(f"Databricks connection failed: {e}")
-        return create_empty_response(), f"Connection failed: {str(e)[:100]}"
-
-def convert_databricks_to_dashboard_format(latest_data, full_df):
-    """Convert your Databricks data to dashboard format"""
-    
-    if latest_data.empty:
-        return create_empty_response()
-    
-    # Get metadata
-    first_row = latest_data.iloc[0]
-    
-    # Get approved setups from latest run
-    approved_setups = latest_data[
-        (latest_data['setup_approved'] == True) & 
-        (latest_data['symbol'] != 'NO_SETUPS')
-    ]
-    
-    # Create trading setups
-    trading_setups = []
-    for _, row in approved_setups.iterrows():
-        
-        # Map your conditions to setup types
-        setup_type_mapping = {
-            'NEGATIVE_GEX': 'SQUEEZE_PLAY',
-            'HIGH_POSITIVE_GEX': 'PREMIUM_SELLING', 
-            'NEAR_FLIP': 'GAMMA_FLIP'
-        }
-        
-        direction_mapping = {
-            'NEGATIVE_GEX': 'LONG_CALLS',
-            'HIGH_POSITIVE_GEX': 'SHORT_CALLS',
-            'NEAR_FLIP': 'VOLATILITY'
-        }
-        
-        setup_data = {
-            'setup': {
-                'symbol': row['symbol'],
-                'setup_type': setup_type_mapping.get(row['condition_type'], row['condition_type']),
-                'direction': direction_mapping.get(row['condition_type'], 'DIRECTIONAL'),
-                'confidence': float(row['confidence_score']),
-                'reason': f"Pipeline Analysis: GEX {row['net_gex']/1e9:+.1f}B, {row['distance_to_flip']:+.2f}% from flip",
-                'expected_move': float(row['expected_move']) * 100,  # Convert to percentage
-                'hold_days': 3,
-                'risk_level': 'MEDIUM' if row['confidence_score'] >= 80 else 'HIGH'
-            },
-            'position_size_percent': float(row['position_size_percent']),
-            'dollar_amount': int(row['position_size_percent'] * 1000),
-            'approved': bool(row['setup_approved']),
-            'databricks_data': {
-                'run_id': row['run_id'],
-                'net_gex': int(row['net_gex']),
-                'distance_to_flip': float(row['distance_to_flip'])
-            }
-        }
-        
-        trading_setups.append(setup_data)
-    
-    # Calculate market summary from latest data
-    market_data = latest_data[latest_data['symbol'] != 'NO_SETUPS']
-    
-    if not market_data.empty:
-        net_gex_values = market_data['net_gex'].tolist()
-        total_net_gex = sum(net_gex_values) / 1e9
-        
-        # Count conditions
-        condition_counts = market_data['condition_type'].value_counts().to_dict()
-        negative_count = condition_counts.get('NEGATIVE_GEX', 0)
-        positive_count = condition_counts.get('HIGH_POSITIVE_GEX', 0) 
-        near_flip_count = condition_counts.get('NEAR_FLIP', 0)
-        
-        # Determine regime
-        if negative_count > max(positive_count, near_flip_count):
-            dominant_regime = 'NEGATIVE_GEX'
-            stress_level = 'HIGH'
-        elif positive_count > max(negative_count, near_flip_count):
-            dominant_regime = 'HIGH_POSITIVE_GEX'
-            stress_level = 'LOW'
-        elif near_flip_count > 0:
-            dominant_regime = 'NEAR_FLIP'
-            stress_level = 'MEDIUM'
-        else:
-            dominant_regime = 'NEUTRAL'
-            stress_level = 'LOW'
-    else:
-        total_net_gex = 0
-        dominant_regime = 'NEUTRAL'
-        stress_level = 'LOW'
-        negative_count = positive_count = near_flip_count = 0
-    
-    # Historical performance metrics
-    historical_metrics = calculate_historical_performance(full_df)
-    
-    return {
-        'success': True,
-        'analysis_time': pd.to_datetime(first_row['run_timestamp']),
-        'pipeline_run_time': first_row['run_timestamp'],
-        'symbols_analyzed': int(first_row['total_symbols_analyzed']),
-        'trading_setups': trading_setups,
-        'market_summary': {
-            'total_net_gex_billions': total_net_gex,
-            'dominant_regime': dominant_regime,
-            'symbols_near_flip': near_flip_count,
-            'market_stress_level': stress_level,
-            'total_conditions_found': len(market_data),
-            'regime_distribution': {
-                'NEGATIVE_GEX': negative_count,
-                'HIGH_POSITIVE_GEX': positive_count,
-                'NEAR_FLIP': near_flip_count
-            }
-        },
-        'risk_assessment': {
-            'total_risk_percent': sum(s['position_size_percent'] for s in trading_setups),
-            'num_positions': len(trading_setups),
-            'risk_level': 'HIGH' if len(trading_setups) > 3 else 'MEDIUM' if len(trading_setups) > 1 else 'LOW'
-        },
-        'historical_metrics': historical_metrics,
-        'raw_pipeline_data': {
-            'latest_run_id': first_row['run_id'],
-            'total_runs_analyzed': len(full_df['run_id'].unique()),
-            'data_quality': 'EXCELLENT' if first_row['pipeline_success'] else 'DEGRADED'
-        }
+if 'portfolio' not in st.session_state:
+    st.session_state.portfolio = {
+        'positions': [],
+        'cash': 100000,
+        'total_value': 100000,
+        'daily_pnl': 0,
+        'trade_history': []
     }
 
-def calculate_historical_performance(full_df):
-    """Calculate historical performance metrics from your pipeline data"""
-    
-    if full_df.empty:
-        return {}
-    
-    # Group by runs to get performance over time
-    run_summary = full_df.groupby('run_id').agg({
-        'setup_approved': 'sum',
-        'total_setups_found': 'first', 
-        'total_symbols_analyzed': 'first',
-        'pipeline_date': 'first',
-        'confidence_score': 'mean'
-    }).reset_index()
-    
-    # Calculate metrics
-    avg_setups_per_run = run_summary['setup_approved'].mean()
-    success_rate = (run_summary['setup_approved'] > 0).mean() * 100
-    avg_confidence = run_summary['confidence_score'].mean()
-    
-    # Recent vs historical comparison
-    recent_runs = run_summary.tail(5)
-    recent_avg = recent_runs['setup_approved'].mean() if not recent_runs.empty else 0
-    
-    return {
-        'total_pipeline_runs': len(run_summary),
-        'avg_setups_per_run': avg_setups_per_run,
-        'pipeline_success_rate': success_rate,
-        'avg_confidence_score': avg_confidence,
-        'recent_performance': {
-            'recent_avg_setups': recent_avg,
-            'trend': 'IMPROVING' if recent_avg > avg_setups_per_run else 'DECLINING' if recent_avg < avg_setups_per_run else 'STABLE'
-        }
+if 'gex_data' not in st.session_state:
+    st.session_state.gex_data = {}
+
+if 'last_update' not in st.session_state:
+    st.session_state.last_update = None
+
+if 'alerts' not in st.session_state:
+    st.session_state.alerts = []
+
+if 'trade_setups' not in st.session_state:
+    st.session_state.trade_setups = []
+
+if 'api_settings' not in st.session_state:
+    st.session_state.api_settings = {
+        'api_key': '',
+        'username': 'I-RWFNBLR2S1DP',
+        'base_url': 'https://stocks.tradingvolatility.net/api'
     }
 
-def create_empty_response():
-    """Empty response when no data"""
-    return {
-        'success': True,
-        'analysis_time': datetime.now(),
-        'symbols_analyzed': 0,
-        'trading_setups': [],
-        'market_summary': {
-            'total_net_gex_billions': 0,
-            'dominant_regime': 'NEUTRAL',
-            'symbols_near_flip': 0,
-            'market_stress_level': 'LOW'
-        },
-        'risk_assessment': {
-            'total_risk_percent': 0,
-            'num_positions': 0,
-            'risk_level': 'NONE'
-        },
-        'historical_metrics': {}
-    }
+# ======================== TRADING VOLATILITY API CLIENT ========================
 
-def render_hero_section():
-    """Beautiful hero section"""
-    st.markdown("""
-    <div class="hero-container">
-        <h1 style="text-align: center; font-size: 3.5rem; margin-bottom: 0.5rem; text-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-            🚀 GEX Trading Command Center
-        </h1>
-        <p style="text-align: center; font-size: 1.3rem; opacity: 0.9; margin-bottom: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
-            Live Databricks Pipeline • Real Gamma Exposure Analysis • Institutional-Grade Setups
-        </p>
-        <div style="text-align: center; margin-top: 1rem; opacity: 0.7;">
-            <span style="font-size: 0.9rem;">🔥 Connected to your actual GEX pipeline • Zero mock data</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_connection_status(source, last_update, data_quality="UNKNOWN"):
-    """Enhanced connection status"""
+class TradingVolatilityAPI:
+    """Client for TradingVolatility.net API"""
     
-    if "Live from Databricks" in source:
-        status_class = "status-live"
-        status_text = "🟢 LIVE CONNECTION"
-        status_detail = f"Pipeline run: {last_update.strftime('%Y-%m-%d %H:%M:%S')}"
-        quality_color = "#00ff88" if data_quality == "EXCELLENT" else "#ffaa00"
-    else:
-        status_class = "status-error"
-        status_text = "🔴 CONNECTION ISSUE"
-        status_detail = source
-        quality_color = "#ff4444"
-    
-    st.markdown(f"""
-    <div style="text-align: right; margin-bottom: 1.5rem;">
-        <div style="display: inline-block; padding: 1rem; background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05)); 
-                    border-radius: 12px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
-            <span class="status-indicator {status_class}"></span>
-            <span style="font-weight: bold; font-size: 1.1rem;">{status_text}</span>
-            <br>
-            <span style="opacity: 0.8; font-size: 0.9rem;">{status_detail}</span>
-            <br>
-            <span style="color: {quality_color}; font-size: 0.8rem; font-weight: 600;">Data Quality: {data_quality}</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_enhanced_metrics(data):
-    """Enhanced metrics with your real Databricks data"""
-    
-    market_summary = data['market_summary']
-    risk_assessment = data['risk_assessment']
-    historical = data.get('historical_metrics', {})
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        net_gex = market_summary['total_net_gex_billions']
-        gex_color = "#ff4444" if net_gex < 0 else "#00ff88"
-        trend_arrow = "↓" if net_gex < 0 else "↑"
-        
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="big-number" style="color: {gex_color};">
-                {net_gex:+.2f}B
-            </div>
-            <div style="font-size: 1.1rem; font-weight: 600; margin: 0.5rem 0;">Net GEX</div>
-            <div style="font-size: 0.9rem; opacity: 0.8;">
-                From Your Pipeline {trend_arrow}
-            </div>
-            <div style="font-size: 0.8rem; opacity: 0.6; margin-top: 0.5rem;">
-                {market_summary['dominant_regime'].replace('_', ' ').title()}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        approved_setups = len([s for s in data['trading_setups'] if s['approved']])
-        avg_setups = historical.get('avg_setups_per_run', 0)
-        comparison = "🔥" if approved_setups > avg_setups else "📊" if approved_setups == avg_setups else "🔍"
-        
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="big-number" style="color: #00aaff;">
-                {approved_setups}
-            </div>
-            <div style="font-size: 1.1rem; font-weight: 600; margin: 0.5rem 0;">Live Setups</div>
-            <div style="font-size: 0.9rem; opacity: 0.8;">
-                High Confidence {comparison}
-            </div>
-            <div style="font-size: 0.8rem; opacity: 0.6; margin-top: 0.5rem;">
-                Avg: {avg_setups:.1f} per run
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        stress_level = market_summary['market_stress_level']
-        stress_colors = {'LOW': '#00ff88', 'MEDIUM': '#ffaa00', 'HIGH': '#ff4444'}
-        stress_color = stress_colors.get(stress_level, '#ffffff')
-        stress_emoji = {'LOW': '😌', 'MEDIUM': '😐', 'HIGH': '😰'}.get(stress_level, '🤔')
-        
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="big-number" style="color: {stress_color};">
-                {stress_level}
-            </div>
-            <div style="font-size: 1.1rem; font-weight: 600; margin: 0.5rem 0;">Market Stress</div>
-            <div style="font-size: 0.9rem; opacity: 0.8;">
-                {market_summary['symbols_near_flip']} Near Flip {stress_emoji}
-            </div>
-            <div style="font-size: 0.8rem; opacity: 0.6; margin-top: 0.5rem;">
-                Pipeline Analysis
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        total_risk = risk_assessment['total_risk_percent']
-        risk_color = "#00ff88" if total_risk < 5 else "#ffaa00" if total_risk < 8 else "#ff4444"
-        risk_emoji = "✅" if total_risk < 5 else "⚠️" if total_risk < 8 else "🚨"
-        
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="big-number" style="color: {risk_color};">
-                {total_risk:.1f}%
-            </div>
-            <div style="font-size: 1.1rem; font-weight: 600; margin: 0.5rem 0;">Portfolio Risk</div>
-            <div style="font-size: 0.9rem; opacity: 0.8;">
-                {risk_assessment['num_positions']} Positions {risk_emoji}
-            </div>
-            <div style="font-size: 0.8rem; opacity: 0.6; margin-top: 0.5rem;">
-                Risk Level: {risk_assessment['risk_level']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-def render_pipeline_setups(data):
-    """Render your actual pipeline setups with enhanced visuals"""
-    
-    st.markdown("## 🎯 Live Trading Setups from Your Databricks Pipeline")
-    
-    approved_setups = [s for s in data['trading_setups'] if s['approved']]
-    
-    if not approved_setups:
-        st.markdown("""
-        <div class="success-container">
-            <h3>📊 No High-Confidence Setups in Latest Pipeline Run</h3>
-            <p style="font-size: 1.1rem;">Your GEX analysis didn't find setups meeting the strict criteria.</p>
-            <p style="opacity: 0.8;">✅ This is normal and shows quality control is working!</p>
-            <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.7;">
-                <strong>Pipeline Status:</strong> Running successfully • Data being collected for backtesting
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    # Show summary first
-    avg_confidence = sum(s['setup']['confidence'] for s in approved_setups) / len(approved_setups)
-    total_allocation = sum(s['position_size_percent'] for s in approved_setups)
-    
-    st.markdown(f"""
-    <div class="success-container">
-        <div style="display: flex; justify-content: space-around; text-align: center;">
-            <div>
-                <div style="font-size: 1.5rem; font-weight: bold;">{len(approved_setups)}</div>
-                <div style="opacity: 0.8;">Active Setups</div>
-            </div>
-            <div>
-                <div style="font-size: 1.5rem; font-weight: bold;">{avg_confidence:.0f}%</div>
-                <div style="opacity: 0.8;">Avg Confidence</div>
-            </div>
-            <div>
-                <div style="font-size: 1.5rem; font-weight: bold;">{total_allocation:.1f}%</div>
-                <div style="opacity: 0.8;">Total Allocation</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Render each setup
-    for i, setup_info in enumerate(approved_setups):
-        setup = setup_info['setup']
-        databricks_data = setup_info.get('databricks_data', {})
-        
-        # Enhanced confidence styling
-        confidence = setup['confidence']
-        if confidence >= 85:
-            confidence_class = "confidence-high"
-            confidence_emoji = "🟢"
-            confidence_label = "PREMIUM"
-        elif confidence >= 75:
-            confidence_class = "confidence-high" 
-            confidence_emoji = "🟢"
-            confidence_label = "HIGH"
-        elif confidence >= 65:
-            confidence_class = "confidence-medium"
-            confidence_emoji = "🟡"
-            confidence_label = "MEDIUM"
-        else:
-            confidence_class = "confidence-low"
-            confidence_emoji = "🔴"
-            confidence_label = "LOW"
-        
-        # Setup type styling
-        type_emojis = {
-            'SQUEEZE_PLAY': '🚀',
-            'PREMIUM_SELLING': '💰',
-            'GAMMA_FLIP': '⚡'
+    def __init__(self, api_key: str, username: str):
+        self.api_key = api_key
+        self.username = username
+        self.base_url = "https://stocks.tradingvolatility.net/api"
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'User-Agent': f'GEX-Dashboard/{username}'
         }
-        type_emoji = type_emojis.get(setup['setup_type'], '📊')
+        self.last_request_time = 0
+        self.min_request_interval = 3  # 3 seconds between requests
+    
+    def _rate_limit(self):
+        """Implement rate limiting"""
+        now = time_module.time()
+        time_since_last = now - self.last_request_time
+        if time_since_last < self.min_request_interval:
+            time_module.sleep(self.min_request_interval - time_since_last)
+        self.last_request_time = time_module.time()
+    
+    def get_net_gex(self, symbol: str) -> Dict:
+        """Get net GEX data for a symbol"""
+        self._rate_limit()
         
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            st.markdown(f"""
-            <div class="setup-card {confidence_class}">
-                <div class="setup-title">
-                    {type_emoji} {setup['symbol']} - {setup['setup_type'].replace('_', ' ').title()}
-                    <span style="float: right; font-size: 0.8rem; opacity: 0.7;">#{i+1}</span>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div>
-                        <strong>Direction:</strong> {setup['direction'].replace('_', ' ')}
-                    </div>
-                    <div style="text-align: right;">
-                        {confidence_emoji} <strong>{confidence:.0f}% {confidence_label}</strong>
-                    </div>
-                </div>
-                
-                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.8rem; margin: 1rem 0;">
-                    <div style="font-size: 0.9rem;"><strong>Pipeline Analysis:</strong></div>
-                    <div style="margin-top: 0.3rem;">{setup['reason']}</div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
-                    <div>
-                        <div style="opacity: 0.7;">Position Size</div>
-                        <div style="font-weight: bold;">{setup_info['position_size_percent']:.1f}%</div>
-                        <div style="font-size: 0.8rem; opacity: 0.6;">${setup_info['dollar_amount']:,.0f}</div>
-                    </div>
-                    <div>
-                        <div style="opacity: 0.7;">Expected Move</div>
-                        <div style="font-weight: bold;">{setup['expected_move']:.1f}%</div>
-                        <div style="font-size: 0.8rem; opacity: 0.6;">{setup['hold_days']} day hold</div>
-                    </div>
-                    <div>
-                        <div style="opacity: 0.7;">Risk Level</div>
-                        <div style="font-weight: bold;">{setup['risk_level']}</div>
-                        <div style="font-size: 0.8rem; opacity: 0.6;">Pipeline Calc</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.8rem; opacity: 0.7;">
-                    🗄️ <strong>Databricks ID:</strong> {databricks_data.get('run_id', 'N/A')[-12:]} | 
-                    <strong>Raw GEX:</strong> {databricks_data.get('net_gex', 0)/1e6:.0f}M
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            # Action buttons
-            st.markdown(f"""
-            <div style="display: flex; flex-direction: column; gap: 0.8rem; padding: 1rem;">
-                <button style="background: linear-gradient(45deg, #00ff88, #00cc70); border: none; 
-                              border-radius: 8px; padding: 0.7rem; color: white; font-weight: bold;
-                              cursor: pointer; transition: all 0.3s ease;">
-                    📊 Analyze Setup
-                </button>
-                <button style="background: linear-gradient(45deg, #0088ff, #0066cc); border: none; 
-                              border-radius: 8px; padding: 0.7rem; color: white; font-weight: bold;
-                              cursor: pointer; transition: all 0.3s ease;">
-                    📈 View Chart
-                </button>
-                <button style="background: linear-gradient(45deg, #ff6b35, #f7931e); border: none; 
-                              border-radius: 8px; padding: 0.7rem; color: white; font-weight: bold;
-                              cursor: pointer; transition: all 0.3s ease;">
-                    ⚡ Quick Trade
-                </button>
-            </div>
-            """, unsafe_allow_html=True)
+        try:
+            url = f"{self.base_url}/net-gex/{symbol}"
+            response = requests.get(url, headers=self.headers, timeout=30)
             
-            if st.button(f"📋 Raw Data", key=f"raw_{setup['symbol']}_{i}"):
-                st.json(setup_info)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"API error for {symbol}: {response.status_code}")
+                return {"error": f"API error: {response.status_code}"}
+                
+        except Exception as e:
+            logger.error(f"Error fetching GEX for {symbol}: {str(e)}")
+            return {"error": str(e)}
+    
+    def get_gex_levels(self, symbol: str) -> Dict:
+        """Get GEX levels CSV data"""
+        self._rate_limit()
+        
+        try:
+            url = f"{self.base_url}/gex-levels-csv/{symbol}"
+            response = requests.get(url, headers=self.headers, timeout=30)
+            
+            if response.status_code == 200:
+                return {"data": response.text, "symbol": symbol}
+            else:
+                logger.error(f"GEX levels error for {symbol}: {response.status_code}")
+                return {"error": f"API error: {response.status_code}"}
+                
+        except Exception as e:
+            logger.error(f"Error fetching GEX levels for {symbol}: {str(e)}")
+            return {"error": str(e)}
+    
+    def get_options_flow(self, symbol: str) -> Dict:
+        """Get options flow data"""
+        self._rate_limit()
+        
+        try:
+            url = f"{self.base_url}/options-flow/{symbol}"
+            response = requests.get(url, headers=self.headers, timeout=30)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return {"error": f"API error: {response.status_code}"}
+                
+        except Exception as e:
+            return {"error": str(e)}
 
-def render_market_overview_chart(data):
-    """Enhanced market overview with your data"""
+# ======================== GEX CALCULATION ENGINE ========================
+
+@dataclass
+class GEXProfile:
+    """Complete GEX profile for a symbol"""
+    symbol: str
+    spot_price: float
+    net_gex: float
+    gamma_flip: float
+    call_walls: List[Dict]
+    put_walls: List[Dict]
+    gex_by_strike: List[Dict]
+    regime: str
+    last_updated: datetime
+    api_data: Dict = field(default_factory=dict)
+
+class ComprehensiveGEXCalculator:
+    """Advanced GEX calculator with TradingVolatility API integration"""
     
-    st.markdown("## 📊 Live Market Intelligence")
-    
-    market_summary = data['market_summary']
-    regime_dist = market_summary.get('regime_distribution', {})
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        # Create regime distribution chart
-        if any(regime_dist.values()):
-            regime_names = list(regime_dist.keys())
-            regime_values = list(regime_dist.values())
-            regime_colors = ['#ff4444', '#00ff88', '#ffaa00']
+    def __init__(self, api_client: TradingVolatilityAPI):
+        self.api_client = api_client
+        self.profiles = {}
+        
+    def calculate_comprehensive_gex(self, symbol: str) -> Optional[GEXProfile]:
+        """Calculate comprehensive GEX profile using API data"""
+        try:
+            # Get data from TradingVolatility API
+            net_gex_data = self.api_client.get_net_gex(symbol)
+            gex_levels_data = self.api_client.get_gex_levels(symbol)
             
-            fig = go.Figure(data=[
-                go.Bar(
-                    x=regime_names,
-                    y=regime_values,
-                    marker_color=regime_colors[:len(regime_names)],
-                    text=regime_values,
-                    textposition='auto',
-                )
-            ])
+            if "error" in net_gex_data:
+                logger.error(f"Failed to get net GEX for {symbol}: {net_gex_data['error']}")
+                return None
+                
+            if "error" in gex_levels_data:
+                logger.error(f"Failed to get GEX levels for {symbol}: {gex_levels_data['error']}")
+                return None
             
-            fig.update_layout(
-                title="GEX Regime Distribution from Your Pipeline",
-                xaxis_title="Market Regime",
-                yaxis_title="Number of Symbols",
-                template="plotly_dark",
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='white'),
-                height=400
+            # Parse the data
+            profile = self._parse_api_data(symbol, net_gex_data, gex_levels_data)
+            
+            if profile:
+                self.profiles[symbol] = profile
+            
+            return profile
+            
+        except Exception as e:
+            logger.error(f"Error calculating GEX for {symbol}: {str(e)}")
+            return None
+    
+    def _parse_api_data(self, symbol: str, net_gex_data: Dict, gex_levels_data: Dict) -> Optional[GEXProfile]:
+        """Parse API data into GEX profile"""
+        try:
+            # Get current price (fallback to Yahoo if API doesn't provide)
+            spot_price = self._get_current_price(symbol)
+            
+            # Parse GEX levels CSV
+            levels_text = gex_levels_data.get('data', '')
+            gex_levels = self._parse_gex_levels_csv(levels_text)
+            
+            if not gex_levels:
+                logger.error(f"Failed to parse GEX levels for {symbol}")
+                return None
+            
+            # Extract key levels
+            gamma_flip = gex_levels.get('gamma_flip', spot_price)
+            
+            # Create call and put walls from the levels
+            call_walls = []
+            put_walls = []
+            
+            # Parse GEX levels for walls
+            for i in range(1, 5):  # GEX_1 through GEX_4
+                gex_key = f'gex_{i}'
+                if gex_key in gex_levels:
+                    strike = gex_levels[gex_key]
+                    if strike > gamma_flip:
+                        call_walls.append({
+                            'strike': strike,
+                            'gex': 1000000 * (5-i),  # Estimate strength
+                            'strength': 'strong' if i <= 2 else 'moderate'
+                        })
+                    else:
+                        put_walls.append({
+                            'strike': strike,
+                            'gex': -1000000 * (5-i),  # Estimate strength
+                            'strength': 'strong' if i <= 2 else 'moderate'
+                        })
+            
+            # Calculate net GEX estimate
+            net_gex = net_gex_data.get('net_gex', 0)
+            if isinstance(net_gex, str):
+                try:
+                    net_gex = float(net_gex.replace('B', '')) * 1e9
+                except:
+                    net_gex = 0
+            
+            # Create GEX by strike data
+            gex_by_strike = []
+            all_strikes = [gamma_flip] + [w['strike'] for w in call_walls + put_walls]
+            
+            for strike in sorted(set(all_strikes)):
+                gex_value = 0
+                
+                # Find matching wall
+                for wall in call_walls:
+                    if wall['strike'] == strike:
+                        gex_value = wall['gex']
+                        break
+                
+                for wall in put_walls:
+                    if wall['strike'] == strike:
+                        gex_value = wall['gex']
+                        break
+                
+                gex_by_strike.append({
+                    'strike': strike,
+                    'gex': gex_value,
+                    'cumulative_gex': 0  # Will calculate this
+                })
+            
+            # Calculate cumulative GEX
+            cumulative = 0
+            for entry in gex_by_strike:
+                cumulative += entry['gex']
+                entry['cumulative_gex'] = cumulative
+            
+            # Determine regime
+            regime = 'positive' if net_gex > 0 else 'negative'
+            
+            return GEXProfile(
+                symbol=symbol,
+                spot_price=spot_price,
+                net_gex=net_gex,
+                gamma_flip=gamma_flip,
+                call_walls=sorted(call_walls, key=lambda x: x['gex'], reverse=True),
+                put_walls=sorted(put_walls, key=lambda x: x['gex']),
+                gex_by_strike=gex_by_strike,
+                regime=regime,
+                last_updated=datetime.now(),
+                api_data={'net_gex': net_gex_data, 'levels': gex_levels}
             )
             
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.info("📊 No regime data available from latest pipeline run")
+        except Exception as e:
+            logger.error(f"Error parsing API data for {symbol}: {str(e)}")
+            return None
     
-    with col2:
-        st.markdown("### 🎯 Pipeline Intelligence")
-        
-        # Market summary cards
-        regime = market_summary['dominant_regime']
-        regime_colors = {
-            'NEGATIVE_GEX': '#ff4444',
-            'HIGH_POSITIVE_GEX': '#00ff88',
-            'NEAR_FLIP': '#ffaa00',
-            'NEUTRAL': '#888888'
-        }
-        
-        regime_color = regime_colors.get(regime, '#ffffff')
-        
-        st.markdown(f"""
-        <div class="perf-metric">
-            <div style="color: {regime_color}; font-weight: bold; margin-bottom: 0.5rem;">
-                🎯 {regime.replace('_', ' ').title()}
-            </div>
-            <div style="font-size: 0.9rem; opacity: 0.8;">
-                Dominant market regime from your analysis
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Additional metrics
-        historical = data.get('historical_metrics', {})
-        pipeline_runs = historical.get('total_pipeline_runs', 0)
-        success_rate = historical.get('pipeline_success_rate', 0)
-        
-        metrics_data = [
-            ("🔢 Pipeline Runs", f"{pipeline_runs}"),
-            ("✅ Success Rate", f"{success_rate:.1f}%"),
-            ("📊 Symbols Analyzed", f"{data['symbols_analyzed']}"),
-            ("⚡ Conditions Found", f"{market_summary['total_conditions_found']}"),
-            ("🎯 Near Flip Points", f"{market_summary['symbols_near_flip']}")
-        ]
-        
-        for label, value in metrics_data:
-            st.markdown(f"""
-            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; 
-                        border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <span style="opacity: 0.8;">{label}</span>
-                <span style="font-weight: bold; color: #00aaff;">{value}</span>
-            </div>
-            """, unsafe_allow_html=True)
+    def _parse_gex_levels_csv(self, csv_text: str) -> Dict:
+        """Parse GEX levels CSV text"""
+        try:
+            levels = {}
+            lines = csv_text.strip().split('\n')
+            
+            for line in lines:
+                parts = line.split(',')
+                if len(parts) >= 2:
+                    key = parts[0].strip().lower().replace(' ', '_')
+                    value_str = parts[1].strip()
+                    
+                    try:
+                        value = float(value_str)
+                        levels[key] = value
+                    except ValueError:
+                        continue
+            
+            return levels
+            
+        except Exception as e:
+            logger.error(f"Error parsing GEX levels CSV: {str(e)}")
+            return {}
+    
+    def _get_current_price(self, symbol: str) -> float:
+        """Get current price using yfinance fallback"""
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="1d", interval="1m")
+            if not hist.empty:
+                return float(hist['Close'].iloc[-1])
+            else:
+                # Fallback prices for major symbols
+                fallback_prices = {
+                    'SPY': 450.0, 'QQQ': 350.0, 'IWM': 200.0,
+                    'AAPL': 180.0, 'MSFT': 400.0, 'GOOGL': 140.0,
+                    'AMZN': 140.0, 'TSLA': 250.0, 'META': 500.0,
+                    'NVDA': 900.0
+                }
+                return fallback_prices.get(symbol, 100.0)
+                
+        except Exception as e:
+            logger.error(f"Error getting price for {symbol}: {str(e)}")
+            return 100.0
 
-def render_performance_tracking(data):
-    """Show pipeline performance over time"""
+# ======================== SETUP DETECTION ENGINE ========================
+
+class SetupDetector:
+    """Detect trading setups from GEX profiles"""
     
-    historical = data.get('historical_metrics', {})
+    def __init__(self):
+        self.setup_types = {
+            'squeeze_long_calls': self._detect_squeeze_long_calls,
+            'squeeze_long_puts': self._detect_squeeze_long_puts,
+            'wall_compression': self._detect_wall_compression,
+            'call_selling': self._detect_call_selling,
+            'put_selling': self._detect_put_selling,
+            'iron_condor': self._detect_iron_condor
+        }
     
-    if not historical:
-        return
+    def detect_all_setups(self, profile: GEXProfile) -> List[Dict]:
+        """Detect all possible setups for a profile"""
+        setups = []
+        
+        for setup_name, detector in self.setup_types.items():
+            setup = detector(profile)
+            if setup:
+                setup['type'] = setup_name
+                setup['symbol'] = profile.symbol
+                setup['detected_at'] = datetime.now()
+                setups.append(setup)
+        
+        return sorted(setups, key=lambda x: x.get('confidence', 0), reverse=True)
     
-    st.markdown("## 📈 Pipeline Performance Tracking")
+    def _detect_squeeze_long_calls(self, profile: GEXProfile) -> Optional[Dict]:
+        """Detect negative GEX squeeze setup (long calls)"""
+        if profile.net_gex >= -1e9:  # Need negative GEX < -1B
+            return None
+        
+        # Price should be below gamma flip
+        distance_to_flip = (profile.gamma_flip - profile.spot_price) / profile.spot_price
+        if distance_to_flip < 0.005 or distance_to_flip > 0.02:  # 0.5% to 2%
+            return None
+        
+        # Check for put wall support
+        put_support = None
+        if profile.put_walls:
+            put_support = profile.put_walls[0]['strike']
+            support_distance = (profile.spot_price - put_support) / profile.spot_price
+            if support_distance > 0.015:  # Support too far
+                return None
+        
+        confidence = 75
+        if distance_to_flip < 0.01:
+            confidence += 10
+        if put_support and (profile.spot_price - put_support) / profile.spot_price < 0.01:
+            confidence += 10
+        if profile.net_gex < -2e9:
+            confidence += 5
+        
+        return {
+            'strategy': 'Long Calls (Negative GEX Squeeze)',
+            'entry_strike': profile.gamma_flip,
+            'target': profile.call_walls[0]['strike'] if profile.call_walls else profile.gamma_flip * 1.02,
+            'stop_loss': put_support if put_support else profile.spot_price * 0.98,
+            'confidence': min(confidence, 95),
+            'reasoning': f'Negative GEX {profile.net_gex/1e9:.1f}B, price {distance_to_flip:.1%} below flip',
+            'risk_reward': 2.5,
+            'max_loss_pct': 50,
+            'position_size_pct': 3
+        }
     
-    col1, col2, col3 = st.columns(3)
+    def _detect_squeeze_long_puts(self, profile: GEXProfile) -> Optional[Dict]:
+        """Detect positive GEX breakdown setup (long puts)"""
+        if profile.net_gex <= 2e9:  # Need positive GEX > 2B
+            return None
+        
+        # Price should be near gamma flip (within 0.3%)
+        distance_to_flip = abs(profile.gamma_flip - profile.spot_price) / profile.spot_price
+        if distance_to_flip > 0.005:  # Must be very close
+            return None
+        
+        confidence = 70
+        if distance_to_flip < 0.002:
+            confidence += 15
+        if profile.net_gex > 3e9:
+            confidence += 10
+        
+        return {
+            'strategy': 'Long Puts (Positive GEX Breakdown)',
+            'entry_strike': profile.gamma_flip,
+            'target': profile.put_walls[0]['strike'] if profile.put_walls else profile.gamma_flip * 0.98,
+            'stop_loss': profile.call_walls[0]['strike'] if profile.call_walls else profile.spot_price * 1.02,
+            'confidence': min(confidence, 95),
+            'reasoning': f'Positive GEX {profile.net_gex/1e9:.1f}B, price at flip point',
+            'risk_reward': 2.0,
+            'max_loss_pct': 50,
+            'position_size_pct': 3
+        }
     
-    with col1:
-        avg_setups = historical.get('avg_setups_per_run', 0)
-        st.metric(
-            label="Avg Setups per Run",
-            value=f"{avg_setups:.1f}",
-            delta=None
+    def _detect_wall_compression(self, profile: GEXProfile) -> Optional[Dict]:
+        """Detect gamma wall compression setup"""
+        if not profile.call_walls or not profile.put_walls:
+            return None
+        
+        call_wall = profile.call_walls[0]['strike']
+        put_wall = profile.put_walls[0]['strike']
+        
+        compression_ratio = (call_wall - put_wall) / profile.spot_price
+        if compression_ratio > 0.025:  # Walls must be < 2.5% apart
+            return None
+        
+        confidence = 80 if compression_ratio < 0.015 else 70
+        
+        # Determine direction based on current position
+        if profile.spot_price < (call_wall + put_wall) / 2:
+            direction = 'calls'
+            entry = call_wall
+        else:
+            direction = 'puts'
+            entry = put_wall
+        
+        return {
+            'strategy': f'Wall Compression - Long {direction.capitalize()}',
+            'entry_strike': entry,
+            'target': call_wall if direction == 'calls' else put_wall,
+            'stop_loss': put_wall if direction == 'calls' else call_wall,
+            'confidence': confidence,
+            'reasoning': f'Walls compressed to {compression_ratio:.1%} range',
+            'risk_reward': 3.0,
+            'max_loss_pct': 100,
+            'position_size_pct': 2
+        }
+    
+    def _detect_call_selling(self, profile: GEXProfile) -> Optional[Dict]:
+        """Detect call selling opportunity at resistance"""
+        if profile.net_gex <= 3e9 or not profile.call_walls:
+            return None
+        
+        call_wall = profile.call_walls[0]
+        distance_to_wall = (call_wall['strike'] - profile.spot_price) / profile.spot_price
+        
+        if distance_to_wall < 0.005 or distance_to_wall > 0.02:
+            return None
+        
+        confidence = 75
+        if call_wall['strength'] == 'strong':
+            confidence += 10
+        if distance_to_wall < 0.01:
+            confidence += 10
+        
+        return {
+            'strategy': 'Sell Calls at Wall',
+            'entry_strike': call_wall['strike'],
+            'target': profile.spot_price,
+            'stop_loss': call_wall['strike'] * 1.01,
+            'confidence': confidence,
+            'reasoning': f'Strong call wall at {call_wall["strike"]}, positive GEX {profile.net_gex/1e9:.1f}B',
+            'risk_reward': 1.5,
+            'max_loss_pct': 100,
+            'position_size_pct': 5
+        }
+    
+    def _detect_put_selling(self, profile: GEXProfile) -> Optional[Dict]:
+        """Detect put selling opportunity at support"""
+        if not profile.put_walls:
+            return None
+        
+        put_wall = profile.put_walls[0]
+        distance_to_wall = (profile.spot_price - put_wall['strike']) / profile.spot_price
+        
+        if distance_to_wall < 0.01 or distance_to_wall > 0.03:
+            return None
+        
+        confidence = 70
+        if put_wall['strength'] == 'strong':
+            confidence += 10
+        if profile.net_gex > 1e9:
+            confidence += 10
+        
+        return {
+            'strategy': 'Sell Puts at Wall',
+            'entry_strike': put_wall['strike'],
+            'target': profile.spot_price,
+            'stop_loss': put_wall['strike'] * 0.99,
+            'confidence': confidence,
+            'reasoning': f'Strong put wall at {put_wall["strike"]}',
+            'risk_reward': 1.5,
+            'max_loss_pct': 100,
+            'position_size_pct': 5
+        }
+    
+    def _detect_iron_condor(self, profile: GEXProfile) -> Optional[Dict]:
+        """Detect iron condor setup"""
+        if not profile.call_walls or not profile.put_walls or profile.net_gex <= 1e9:
+            return None
+        
+        call_wall = profile.call_walls[0]['strike']
+        put_wall = profile.put_walls[0]['strike']
+        
+        range_pct = (call_wall - put_wall) / profile.spot_price
+        if range_pct < 0.03 or range_pct > 0.08:  # 3% to 8% range
+            return None
+        
+        confidence = 65
+        if 0.04 <= range_pct <= 0.06:  # Optimal range
+            confidence += 15
+        
+        return {
+            'strategy': 'Iron Condor',
+            'entry_strike': f"{put_wall:.0f}/{call_wall:.0f}",
+            'target': profile.spot_price,
+            'stop_loss': 'Manage at 50% loss',
+            'confidence': confidence,
+            'reasoning': f'Stable {range_pct:.1%} range between walls',
+            'risk_reward': 1.0,
+            'max_loss_pct': 50,
+            'position_size_pct': 10
+        }
+
+# ======================== MAIN DASHBOARD ========================
+
+def create_gex_chart(profile: GEXProfile) -> go.Figure:
+    """Create comprehensive GEX visualization"""
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=['Gamma Exposure Profile', 'Cumulative GEX'],
+        vertical_spacing=0.1,
+        row_heights=[0.7, 0.3]
+    )
+    
+    # Prepare data
+    strikes = [entry['strike'] for entry in profile.gex_by_strike]
+    gex_values = [entry['gex'] for entry in profile.gex_by_strike]
+    cumulative_gex = [entry['cumulative_gex'] for entry in profile.gex_by_strike]
+    
+    # GEX bar chart
+    colors = ['green' if gex > 0 else 'red' for gex in gex_values]
+    fig.add_trace(
+        go.Bar(
+            x=strikes,
+            y=gex_values,
+            name='GEX',
+            marker_color=colors,
+            opacity=0.7
+        ),
+        row=1, col=1
+    )
+    
+    # Cumulative GEX line
+    fig.add_trace(
+        go.Scatter(
+            x=strikes,
+            y=cumulative_gex,
+            name='Cumulative GEX',
+            line=dict(color='blue', width=2)
+        ),
+        row=2, col=1
+    )
+    
+    # Add key levels
+    # Spot price line
+    fig.add_vline(
+        x=profile.spot_price,
+        line_dash="solid",
+        line_color="yellow",
+        annotation_text=f"Spot: ${profile.spot_price:.2f}",
+        row=1, col=1
+    )
+    
+    # Gamma flip line
+    fig.add_vline(
+        x=profile.gamma_flip,
+        line_dash="dash",
+        line_color="orange",
+        annotation_text=f"Flip: ${profile.gamma_flip:.2f}",
+        row=1, col=1
+    )
+    
+    # Call walls
+    for wall in profile.call_walls[:3]:
+        fig.add_vline(
+            x=wall['strike'],
+            line_dash="dot",
+            line_color="green",
+            annotation_text=f"Call Wall: ${wall['strike']:.0f}",
+            row=1, col=1
         )
     
-    with col2:
-        success_rate = historical.get('pipeline_success_rate', 0)
-        st.metric(
-            label="Pipeline Success Rate",
-            value=f"{success_rate:.1f}%",
-            delta=None
+    # Put walls
+    for wall in profile.put_walls[:3]:
+        fig.add_vline(
+            x=wall['strike'],
+            line_dash="dot",
+            line_color="red",
+            annotation_text=f"Put Wall: ${wall['strike']:.0f}",
+            row=1, col=1
         )
     
-    with col3:
-        avg_confidence = historical.get('avg_confidence_score', 0)
-        st.metric(
-            label="Avg Confidence Score",
-            value=f"{avg_confidence:.0f}%",
-            delta=None
-        )
+    fig.update_layout(
+        title=f"{profile.symbol} Gamma Exposure Analysis",
+        height=800,
+        showlegend=True,
+        template="plotly_dark"
+    )
     
-    # Trend analysis
-    recent_perf = historical.get('recent_performance', {})
-    trend = recent_perf.get('trend', 'STABLE')
+    fig.update_xaxes(title_text="Strike Price", row=1, col=1)
+    fig.update_yaxes(title_text="Gamma Exposure", row=1, col=1)
+    fig.update_xaxes(title_text="Strike Price", row=2, col=1)
+    fig.update_yaxes(title_text="Cumulative GEX", row=2, col=1)
     
-    trend_colors = {'IMPROVING': '#00ff88', 'STABLE': '#00aaff', 'DECLINING': '#ffaa00'}
-    trend_color = trend_colors.get(trend, '#ffffff')
-    
-    st.markdown(f"""
-    <div class="perf-metric">
-        <div style="color: {trend_color}; font-weight: bold;">
-            📊 Recent Trend: {trend}
-        </div>
-        <div style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.3rem;">
-            Based on last 5 pipeline runs vs historical average
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    return fig
 
 def main():
     """Main dashboard application"""
     
-    # Hero section
-    render_hero_section()
+    # Header
+    st.title("🚀 Professional GEX Trading Dashboard")
+    st.markdown("*Advanced Gamma Exposure Analysis for Strategic Options Trading*")
     
-    # Control panel
-    col1, col2, col3 = st.columns([2, 1, 1])
+    # Sidebar configuration
+    with st.sidebar:
+        st.header("⚙️ Configuration")
+        
+        # API Settings
+        st.subheader("TradingVolatility API")
+        api_key = st.text_input(
+            "API Key",
+            value=st.session_state.api_settings['api_key'],
+            type="password",
+            help="Your TradingVolatility.net API key"
+        )
+        
+        username = st.text_input(
+            "Username",
+            value=st.session_state.api_settings['username'],
+            help="Your TradingVolatility.net username"
+        )
+        
+        if api_key != st.session_state.api_settings['api_key']:
+            st.session_state.api_settings['api_key'] = api_key
+        
+        if username != st.session_state.api_settings['username']:
+            st.session_state.api_settings['username'] = username
+        
+        # Symbol selection
+        st.subheader("📊 Symbol Selection")
+        
+        # Predefined symbol groups
+        etf_symbols = ['SPY', 'QQQ', 'IWM', 'XLF', 'XLE', 'XLK', 'GLD', 'TLT']
+        mega_cap_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'BRK-B']
+        popular_symbols = ['AMD', 'NFLX', 'CRM', 'UBER', 'SQ', 'ROKU', 'ZM', 'PTON']
+        
+        symbol_group = st.selectbox(
+            "Symbol Group",
+            ["Custom", "ETFs", "Mega Cap", "Popular Stocks"]
+        )
+        
+        if symbol_group == "ETFs":
+            symbols = st.multiselect("Select ETFs", etf_symbols, default=['SPY', 'QQQ'])
+        elif symbol_group == "Mega Cap":
+            symbols = st.multiselect("Select Mega Cap", mega_cap_symbols, default=['AAPL', 'MSFT'])
+        elif symbol_group == "Popular Stocks":
+            symbols = st.multiselect("Select Popular", popular_symbols, default=['AMD', 'NFLX'])
+        else:
+            custom_symbols = st.text_input(
+                "Custom Symbols (comma-separated)",
+                value="SPY,QQQ,AAPL",
+                help="Enter symbols separated by commas"
+            )
+            symbols = [s.strip().upper() for s in custom_symbols.split(',') if s.strip()]
+        
+        # Analysis options
+        st.subheader("🔧 Analysis Options")
+        auto_refresh = st.checkbox("Auto Refresh (5 min)", value=False)
+        show_setups = st.checkbox("Show Trade Setups", value=True)
+        show_detailed_charts = st.checkbox("Detailed Charts", value=True)
+        confidence_threshold = st.slider("Setup Confidence Threshold", 50, 95, 70)
+        
+        # Analysis button
+        analyze_button = st.button("🔄 Run Analysis", type="primary")
     
-    with col2:
-        if st.button("🔄 Refresh Pipeline Data", use_container_width=True):
-            st.cache_data.clear()
+    # Main content area
+    if not api_key:
+        st.warning("⚠️ Please enter your TradingVolatility API key in the sidebar to begin analysis.")
+        st.info("You can get your API key from https://stocks.tradingvolatility.net/api")
+        return
+    
+    if not symbols:
+        st.warning("⚠️ Please select symbols to analyze.")
+        return
+    
+    # Initialize API client
+    api_client = TradingVolatilityAPI(api_key, username)
+    gex_calculator = ComprehensiveGEXCalculator(api_client)
+    setup_detector = SetupDetector()
+    
+    # Run analysis
+    if analyze_button or auto_refresh:
+        
+        # Progress tracking
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        all_profiles = {}
+        all_setups = []
+        
+        for i, symbol in enumerate(symbols):
+            status_text.text(f"Analyzing {symbol}... ({i+1}/{len(symbols)})")
+            
+            # Calculate GEX profile
+            profile = gex_calculator.calculate_comprehensive_gex(symbol)
+            
+            if profile:
+                all_profiles[symbol] = profile
+                
+                # Detect setups
+                if show_setups:
+                    setups = setup_detector.detect_all_setups(profile)
+                    for setup in setups:
+                        if setup.get('confidence', 0) >= confidence_threshold:
+                            all_setups.append(setup)
+            
+            progress_bar.progress((i + 1) / len(symbols))
+        
+        status_text.text("Analysis complete!")
+        st.session_state.gex_data = all_profiles
+        st.session_state.trade_setups = all_setups
+        st.session_state.last_update = datetime.now()
+        
+        # Clear progress
+        progress_bar.empty()
+        status_text.empty()
+    
+    # Display results
+    if st.session_state.gex_data:
+        
+        # Summary metrics
+        st.subheader("📊 Market Overview")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        profiles = list(st.session_state.gex_data.values())
+        
+        with col1:
+            positive_gex = sum(1 for p in profiles if p.net_gex > 0)
+            st.metric("Positive GEX Symbols", positive_gex, f"{positive_gex/len(profiles)*100:.0f}%")
+        
+        with col2:
+            avg_distance_to_flip = np.mean([
+                abs(p.gamma_flip - p.spot_price) / p.spot_price 
+                for p in profiles
+            ]) * 100
+            st.metric("Avg Distance to Flip", f"{avg_distance_to_flip:.1f}%")
+        
+        with col3:
+            total_setups = len(st.session_state.trade_setups)
+            high_conf_setups = len([s for s in st.session_state.trade_setups if s.get('confidence', 0) >= 80])
+            st.metric("Trade Setups", total_setups, f"{high_conf_setups} high confidence")
+        
+        with col4:
+            if st.session_state.last_update:
+                minutes_ago = int((datetime.now() - st.session_state.last_update).total_seconds() / 60)
+                st.metric("Last Update", f"{minutes_ago} min ago")
+        
+        # Trade setups section
+        if show_setups and st.session_state.trade_setups:
+            st.subheader("🎯 High-Probability Trade Setups")
+            
+            for setup in st.session_state.trade_setups[:10]:  # Show top 10
+                with st.expander(f"{setup['symbol']} - {setup['strategy']} (Confidence: {setup['confidence']}%)"):
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown(f"**Entry:** {setup['entry_strike']}")
+                        st.markdown(f"**Target:** {setup['target']}")
+                        st.markdown(f"**Stop Loss:** {setup['stop_loss']}")
+                    
+                    with col2:
+                        st.markdown(f"**R/R Ratio:** {setup.get('risk_reward', 'N/A')}")
+                        st.markdown(f"**Max Loss:** {setup.get('max_loss_pct', 'N/A')}%")
+                        st.markdown(f"**Position Size:** {setup.get('position_size_pct', 'N/A')}%")
+                    
+                    with col3:
+                        confidence_color = "🟢" if setup['confidence'] >= 80 else "🟡" if setup['confidence'] >= 70 else "🔴"
+                        st.markdown(f"**Confidence:** {confidence_color} {setup['confidence']}%")
+                        st.markdown(f"**Reasoning:** {setup['reasoning']}")
+        
+        # Individual symbol analysis
+        st.subheader("🔍 Individual Symbol Analysis")
+        
+        # Symbol selector
+        selected_symbol = st.selectbox(
+            "Select Symbol for Detailed Analysis",
+            list(st.session_state.gex_data.keys())
+        )
+        
+        if selected_symbol and selected_symbol in st.session_state.gex_data:
+            profile = st.session_state.gex_data[selected_symbol]
+            
+            # Symbol overview
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Spot Price", f"${profile.spot_price:.2f}")
+            
+            with col2:
+                st.metric("Gamma Flip", f"${profile.gamma_flip:.2f}")
+            
+            with col3:
+                regime_color = "🟢" if profile.regime == 'positive' else "🔴"
+                st.metric("GEX Regime", f"{regime_color} {profile.regime.title()}")
+            
+            with col4:
+                st.metric("Net GEX", f"{profile.net_gex/1e9:.1f}B")
+            
+            # Walls information
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📞 Call Walls (Resistance)")
+                if profile.call_walls:
+                    for i, wall in enumerate(profile.call_walls[:3]):
+                        distance = (wall['strike'] - profile.spot_price) / profile.spot_price * 100
+                        st.markdown(f"**{i+1}.** ${wall['strike']:.0f} (+{distance:.1f}%) - {wall['strength']}")
+                else:
+                    st.markdown("*No significant call walls*")
+            
+            with col2:
+                st.subheader("📉 Put Walls (Support)")
+                if profile.put_walls:
+                    for i, wall in enumerate(profile.put_walls[:3]):
+                        distance = (profile.spot_price - wall['strike']) / profile.spot_price * 100
+                        st.markdown(f"**{i+1}.** ${wall['strike']:.0f} (-{distance:.1f}%) - {wall['strength']}")
+                else:
+                    st.markdown("*No significant put walls*")
+            
+            # Detailed chart
+            if show_detailed_charts:
+                st.subheader(f"📊 {selected_symbol} GEX Profile")
+                fig = create_gex_chart(profile)
+                st.plotly_chart(fig, use_container_width=True)
+    
+    else:
+        st.info("👆 Click 'Run Analysis' to begin GEX analysis of your selected symbols.")
+        
+        # Educational content
+        with st.expander("📚 What is Gamma Exposure (GEX)?"):
+            st.markdown("""
+            **Gamma Exposure (GEX)** measures the aggregate gamma exposure of options dealers and market makers.
+            
+            ### How it Works:
+            - **Positive GEX**: Dealers are long gamma → they sell rallies and buy dips → volatility suppression
+            - **Negative GEX**: Dealers are short gamma → they buy rallies and sell dips → volatility amplification
+            
+            ### Key Levels:
+            - **Gamma Flip Point**: Where net GEX crosses zero - critical support/resistance level
+            - **Call Walls**: Strikes with high call gamma - act as resistance where dealers must sell
+            - **Put Walls**: Strikes with high put gamma - act as support where dealers must buy
+            
+            ### Trading Applications:
+            1. **Squeeze Plays**: Exploit negative GEX for trending moves
+            2. **Mean Reversion**: Use positive GEX for range-bound strategies  
+            3. **Wall Trading**: Sell premium at gamma walls, buy breakouts through walls
+            4. **Regime Identification**: Adapt strategies based on GEX environment
+            """)
+    
+    # Footer
+    st.markdown("---")
+    if st.session_state.last_update:
+        st.caption(f"Last updated: {st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')} | "
+                  f"Symbols analyzed: {len(st.session_state.gex_data)} | "
+                  f"Setups found: {len(st.session_state.trade_setups)}")
+    else:
+        st.caption("Professional GEX Trading Dashboard - Ready for analysis")
+    
+    # Auto-refresh logic
+    if auto_refresh and st.session_state.last_update:
+        if (datetime.now() - st.session_state.last_update).total_seconds() > 300:  # 5 minutes
             st.rerun()
-    
-    with col3:
-        auto_refresh = st.toggle("🔄 Auto Refresh", value=False)
-        if auto_refresh:
-            st.info("🔄 Auto-refreshing every 3 minutes")
-    
-    # Initialize connection
-    if not init_databricks_connection():
-        st.stop()
-    
-    # Load live data
-    with st.spinner('🚀 Loading live data from your Databricks pipeline...'):
-        data, source = load_live_databricks_data()
-    
-    if not data or not data.get('success'):
-        st.error("❌ Failed to load pipeline data. Check your Databricks connection.")
-        st.stop()
-    
-    # Show connection status
-    data_quality = data.get('raw_pipeline_data', {}).get('data_quality', 'UNKNOWN')
-    render_connection_status(source, data['analysis_time'], data_quality)
-    
-    # Main metrics
-    render_enhanced_metrics(data)
-    
-    st.markdown("---")
-    
-    # Main content tabs
-    tab1, tab2, tab3 = st.tabs(["🎯 Live Trading Setups", "📊 Market Overview", "📈 Performance"])
-    
-    with tab1:
-        render_pipeline_setups(data)
-    
-    with tab2:
-        render_market_overview_chart(data)
-    
-    with tab3:
-        render_performance_tracking(data)
-    
-    # Footer with pipeline info
-    st.markdown("---")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        pipeline_time = data['analysis_time'].strftime('%Y-%m-%d %H:%M:%S')
-        st.info(f"🗄️ **Pipeline Data**: {pipeline_time}")
-    
-    with col2:
-        age_minutes = (datetime.now() - data['analysis_time']).total_seconds() / 60
-        freshness = "🟢 Fresh" if age_minutes < 10 else "🟡 Recent" if age_minutes < 60 else "🔴 Stale"
-        st.info(f"⏱️ **Data Age**: {age_minutes:.0f} minutes ({freshness})")
-    
-    # Auto refresh logic
-    if auto_refresh:
-        time.sleep(3)  # 3 minute refresh
-        st.rerun()
 
 if __name__ == "__main__":
     main()
