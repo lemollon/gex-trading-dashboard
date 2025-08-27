@@ -121,9 +121,9 @@ def fetch_portfolio_stats():
             COUNT(*) as total_symbols,
             COUNT(CASE WHEN confidence_score >= 70 THEN 1 END) as high_confidence,
             AVG(confidence_score) as avg_confidence,
-            MAX(scan_timestamp) as last_scan
-        FROM gex_trading.scan_results 
-        WHERE scan_timestamp >= current_timestamp() - interval 2 hours
+            MAX(run_timestamp) as last_scan
+        FROM quant_projects.gex_trading.scheduled_pipeline_results 
+        WHERE pipeline_date >= current_date() - interval 1 day
         """
         
         cursor.execute(query)
@@ -296,7 +296,7 @@ def main():
         # Data table
         st.subheader("📋 Current Trading Setups")
         
-        # Format the dataframe for display
+        # Display formatted data
         display_df = filtered_df.copy()
         if 'current_price' in display_df.columns:
             display_df['current_price'] = display_df['current_price'].apply(lambda x: f"${x:.2f}")
@@ -307,11 +307,11 @@ def main():
         if 'distance_to_flip_pct' in display_df.columns:
             display_df['distance_to_flip_pct'] = display_df['distance_to_flip_pct'].apply(lambda x: f"{x:.2f}%")
         if 'net_gex' in display_df.columns:
-            display_df['net_gex'] = display_df['net_gex'].apply(lambda x: f"{x/1e9:.2f}B")
+            display_df['net_gex'] = display_df['net_gex'].apply(lambda x: f"{x/1e9:.2f}B" if abs(x) > 1e6 else f"{x/1e6:.1f}M")
         
         st.dataframe(
-            display_df[['symbol', 'setup_type', 'confidence_score', 'current_price', 
-                       'gamma_flip_point', 'distance_to_flip_pct', 'days_to_expiration']],
+            display_df[['symbol', 'setup_type', 'confidence_score', 'net_gex', 
+                       'distance_to_flip_pct', 'pipeline_date']],
             use_container_width=True
         )
         
