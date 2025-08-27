@@ -1,19 +1,6 @@
-# Query recommendations - REMOVE DATE FILTER (this was the issue!)
-            st.write("📡 Querying recommendations table...")
-            cursor.execute("""
-                SELECT * FROM quant_projects.gex_trading.gex_recommendations
-                ORDER BY created_timestamp DESC
-                LIMIT 50
-            """)
-            
-            recommendations = cursor.fetchall()
-            columns = [desc[0] for desc in cursor.description]
-            recommendations_df = pd.DataFrame(recommendations, columns=columns)
-            
-            st.write(f"📊 Found {len(recommendations_df)} recommendations from Databricks")
-                    """
-🚀 GEX Trading Dashboard - Simplified Working Version
-Based on your working foundation, simplified for reliability
+"""
+GEX Trading Dashboard - Clean Minimal Version
+No colors, pure functionality
 """
 
 import streamlit as st
@@ -38,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Simple, reliable CSS
+# Minimal CSS - no colors
 st.markdown("""
 <style>
     .main {
@@ -46,50 +33,29 @@ st.markdown("""
     }
     
     .metric-container {
-        background: linear-gradient(90deg, #667eea, #764ba2);
+        border: 1px solid #ccc;
         padding: 1rem;
-        border-radius: 10px;
-        color: white;
+        border-radius: 5px;
         text-align: center;
         margin: 0.5rem 0;
+        background: white;
     }
     
     .setup-card {
+        border: 1px solid #ccc;
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 5px;
         margin: 0.5rem 0;
-        border-left: 4px solid;
-    }
-    
-    .setup-high {
-        background: #e8f5e8;
-        border-left-color: #28a745;
-    }
-    
-    .setup-medium {
-        background: #fff3cd;
-        border-left-color: #ffc107;
-    }
-    
-    .setup-low {
-        background: #f8d7da;
-        border-left-color: #dc3545;
+        background: white;
     }
 </style>
 """, unsafe_allow_html=True)
 
 def load_databricks_data():
-    """Load data from Databricks tables - ALWAYS RETURN DATA"""
-    
-    # Always show debug info
-    st.write("🔍 **Debug Info:**")
-    st.write(f"- DATABRICKS_AVAILABLE: {DATABRICKS_AVAILABLE}")
-    st.write(f"- Secrets available: {'databricks' in st.secrets}")
+    """Load data from YOUR ACTUAL working Databricks table structure"""
     
     try:
         if DATABRICKS_AVAILABLE and "databricks" in st.secrets:
-            st.write("📡 Attempting Databricks connection...")
-            
             connection = sql.connect(
                 server_hostname=st.secrets["databricks"]["server_hostname"],
                 http_path=st.secrets["databricks"]["http_path"],
@@ -98,12 +64,21 @@ def load_databricks_data():
             
             cursor = connection.cursor()
             
-            # Query recommendations
+            # Query using YOUR ACTUAL table structure - GET ALL DATA
             cursor.execute("""
-                SELECT * FROM quant_projects.gex_trading.gex_recommendations
-                WHERE created_timestamp >= current_timestamp() - INTERVAL 24 HOURS
-                ORDER BY confidence_score DESC
-                LIMIT 20
+                SELECT 
+                    run_id,
+                    symbol,
+                    structure_type as setup_type,
+                    confidence_score,
+                    spot_price as entry_price,
+                    gamma_flip_point as target_price,
+                    distance_to_flip as net_gex,
+                    recommendation as market_regime,
+                    '2%' as position_size,
+                    created_at as created_timestamp
+                FROM quant_projects.gex_trading.gex_pipeline_results
+                ORDER BY confidence_score DESC, created_at DESC
             """)
             
             recommendations = cursor.fetchall()
@@ -113,91 +88,23 @@ def load_databricks_data():
             cursor.close()
             connection.close()
             
-            st.success("✅ Connected to Databricks successfully!")
-            st.write(f"📊 Found {len(recommendations_df)} recommendations")
-            
             return {
                 'recommendations': recommendations_df,
                 'status': 'connected',
-                'message': 'Connected to Databricks'
+                'message': f'Connected - Found {len(recommendations_df)} recommendations from your pipeline'
             }
             
     except Exception as e:
-        st.warning(f"⚠️ Databricks connection failed: {str(e)}")
-        st.write("🔄 Loading fallback data...")
-    
-    # ALWAYS create fallback data - this was the issue!
-    st.info("📋 Loading sample data for demonstration")
-    
-    recommendations = pd.DataFrame([
-        {
-            'symbol': 'AMC',
-            'setup_type': 'SQUEEZE_PLAY',
-            'confidence_score': 92,
-            'entry_price': 15.45,
-            'target_price': 18.50,
-            'net_gex': -1.2e9,
-            'market_regime': 'NEGATIVE_GEX',
-            'position_size': '3%',
-            'created_timestamp': datetime.now() - timedelta(hours=2)
-        },
-        {
-            'symbol': 'TSLA', 
-            'setup_type': 'PREMIUM_SELLING',
-            'confidence_score': 88,
-            'entry_price': 245.30,
-            'target_price': 240.00,
-            'net_gex': 2.1e9,
-            'market_regime': 'POSITIVE_GEX',
-            'position_size': '2.5%',
-            'created_timestamp': datetime.now() - timedelta(hours=1)
-        },
-        {
-            'symbol': 'PLTR',
-            'setup_type': 'GAMMA_FLIP_PLAY', 
-            'confidence_score': 75,
-            'entry_price': 28.90,
-            'target_price': 32.00,
-            'net_gex': -0.3e9,
-            'market_regime': 'NEUTRAL_GEX',
-            'position_size': '2%',
-            'created_timestamp': datetime.now() - timedelta(hours=3)
-        },
-        {
-            'symbol': 'GME',
-            'setup_type': 'SQUEEZE_PLAY',
-            'confidence_score': 89,
-            'entry_price': 25.80,
-            'target_price': 30.00,
-            'net_gex': -0.8e9,
-            'market_regime': 'NEGATIVE_GEX',
-            'position_size': '2.5%',
-            'created_timestamp': datetime.now() - timedelta(hours=4)
-        },
-        {
-            'symbol': 'NVDA',
-            'setup_type': 'PREMIUM_SELLING',
-            'confidence_score': 82,
-            'entry_price': 890.50,
-            'target_price': 880.00,
-            'net_gex': 1.5e9,
-            'market_regime': 'POSITIVE_GEX',
-            'position_size': '1.5%',
-            'created_timestamp': datetime.now() - timedelta(hours=5)
+        st.error(f"Databricks error: {str(e)}")
+        return {
+            'recommendations': pd.DataFrame(),
+            'status': 'error', 
+            'message': f'Connection failed: {str(e)}'
         }
-    ])
-    
-    st.write(f"✅ Fallback data loaded: {len(recommendations)} recommendations")
-    
-    return {
-        'recommendations': recommendations,
-        'status': 'fallback',
-        'message': 'Using sample data - add Databricks secrets for live connection'
-    }
 
 def main():
     # Header
-    st.title("⚡ GEX Master Pro")
+    st.title("GEX Master Pro")
     st.subheader("Live Databricks Pipeline Dashboard")
     
     # Load data
@@ -206,17 +113,16 @@ def main():
     
     # Connection status
     if data['status'] == 'connected':
-        st.success("✅ Connected to Databricks")
+        st.success("Connected to Databricks")
     else:
-        st.info("🔧 Development Mode - " + data['message'])
+        st.info("Development Mode - " + data['message'])
     
     # Sidebar
     with st.sidebar:
-        st.header("🎛️ Controls")
+        st.header("Controls")
         
         # Refresh button
-        if st.button("🔄 Refresh Data"):
-            st.cache_data.clear()
+        if st.button("Refresh Data"):
             st.rerun()
         
         st.markdown("---")
@@ -226,8 +132,8 @@ def main():
         
         setup_types = st.multiselect(
             "Setup Types",
-            ['SQUEEZE_PLAY', 'PREMIUM_SELLING', 'GAMMA_FLIP_PLAY'],
-            default=['SQUEEZE_PLAY', 'PREMIUM_SELLING', 'GAMMA_FLIP_PLAY']
+            ['squeeze_play', 'premium_selling', 'gamma_flip_play'],
+            default=['squeeze_play', 'premium_selling', 'gamma_flip_play']
         )
         
         st.markdown("---")
@@ -247,7 +153,7 @@ def main():
         ]
         
         # Key metrics
-        st.subheader("📊 Key Metrics")
+        st.subheader("Key Metrics")
         
         col1, col2, col3, col4 = st.columns(4)
         
@@ -287,27 +193,20 @@ def main():
             """, unsafe_allow_html=True)
         
         # High confidence setups
-        st.subheader("🎯 High Confidence Setups")
+        st.subheader("High Confidence Setups")
         
-        high_conf_setups = filtered_df[filtered_df['confidence_score'] >= 80].head(3)
+        high_conf_setups = filtered_df[filtered_df['confidence_score'] >= 80].head(5)
         
         if not high_conf_setups.empty:
             for _, setup in high_conf_setups.iterrows():
                 confidence = setup['confidence_score']
                 
-                if confidence >= 85:
-                    card_class = 'setup-high'
-                elif confidence >= 75:
-                    card_class = 'setup-medium'  
-                else:
-                    card_class = 'setup-low'
-                
                 st.markdown(f"""
-                <div class="{card_class} setup-card">
+                <div class="setup-card">
                     <h4>{setup['symbol']} - {confidence}% Confidence</h4>
                     <p><strong>Setup:</strong> {setup['setup_type'].replace('_', ' ')}</p>
                     <p><strong>Entry:</strong> ${setup['entry_price']:.2f} | <strong>Target:</strong> ${setup['target_price']:.2f}</p>
-                    <p><strong>GEX:</strong> {setup['net_gex']/1e9:.2f}B | <strong>Regime:</strong> {setup['market_regime'].replace('_', ' ')}</p>
+                    <p><strong>GEX:</strong> {setup['net_gex']:.2f} | <strong>Regime:</strong> {setup['market_regime']}</p>
                     <p><strong>Position Size:</strong> {setup['position_size']}</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -315,7 +214,7 @@ def main():
             st.info("No high-confidence setups match your filters")
         
         # Charts
-        st.subheader("📈 Analysis")
+        st.subheader("Analysis")
         
         chart_col1, chart_col2 = st.columns(2)
         
@@ -327,12 +226,14 @@ def main():
             fig_pie = go.Figure(data=[go.Pie(
                 labels=['Positive GEX', 'Negative GEX'],
                 values=[positive_count, negative_count],
-                marker_colors=['#28a745', '#dc3545']
+                marker_colors=['#666666', '#999999']
             )])
             
             fig_pie.update_layout(
                 title="GEX Distribution",
-                height=300
+                height=300,
+                paper_bgcolor='white',
+                plot_bgcolor='white'
             )
             
             st.plotly_chart(fig_pie, use_container_width=True)
@@ -346,39 +247,38 @@ def main():
             fig_bar = go.Figure(data=[go.Bar(
                 x=['High (80%+)', 'Medium (60-79%)', 'Low (<60%)'],
                 y=[high, medium, low],
-                marker_color=['#28a745', '#ffc107', '#dc3545']
+                marker_color=['#333333', '#666666', '#999999']
             )])
             
             fig_bar.update_layout(
                 title="Confidence Distribution",
-                height=300
+                height=300,
+                paper_bgcolor='white',
+                plot_bgcolor='white'
             )
             
             st.plotly_chart(fig_bar, use_container_width=True)
         
         # Complete data table
-        st.subheader("💼 All Recommendations")
+        st.subheader("All Recommendations")
         
         # Format for display
         display_df = filtered_df.copy()
-        display_df['confidence_score'] = display_df['confidence_score'].apply(lambda x: f"{x}%")
-        display_df['entry_price'] = display_df['entry_price'].apply(lambda x: f"${x:.2f}")
-        display_df['target_price'] = display_df['target_price'].apply(lambda x: f"${x:.2f}")
-        display_df['net_gex'] = display_df['net_gex'].apply(lambda x: f"{x/1e9:.2f}B")
-        display_df['created_timestamp'] = display_df['created_timestamp'].dt.strftime('%H:%M:%S')
+        if 'confidence_score' in display_df.columns:
+            display_df['confidence_score'] = display_df['confidence_score'].apply(lambda x: f"{x}%")
+        if 'entry_price' in display_df.columns:
+            display_df['entry_price'] = display_df['entry_price'].apply(lambda x: f"${x:.2f}")
+        if 'target_price' in display_df.columns:
+            display_df['target_price'] = display_df['target_price'].apply(lambda x: f"${x:.2f}")
+        if 'created_timestamp' in display_df.columns:
+            display_df['created_timestamp'] = pd.to_datetime(display_df['created_timestamp']).dt.strftime('%H:%M:%S')
         
-        st.dataframe(
-            display_df[[
-                'symbol', 'setup_type', 'confidence_score', 'entry_price', 
-                'target_price', 'net_gex', 'market_regime', 'created_timestamp'
-            ]],
-            use_container_width=True
-        )
+        st.dataframe(display_df, use_container_width=True)
         
         # Download button
         csv = filtered_df.to_csv(index=False)
         st.download_button(
-            "📥 Download CSV",
+            "Download CSV",
             csv,
             f"gex_recommendations_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             "text/csv"
