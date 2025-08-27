@@ -1,211 +1,215 @@
+# test_databricks.py
 """
-Streamlit Databricks Connector
-Add this to your Streamlit app to read from your Databricks table
+Streamlit app to test Databricks connection and data loading
+Run with: streamlit run test_databricks.py
 """
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from databricks import sql
 import json
+from datetime import datetime
+import traceback
 
-# Add this to your Streamlit secrets.toml:
-# [databricks]
-# hostname = "your-workspace.cloud.databricks.com"
-# http_path = "/sql/1.0/warehouses/your-warehouse-id"
-# token = "your-access-token"
+st.set_page_config(
+    page_title="GEX Databricks Tester",
+    page_icon="🔧", 
+    layout="wide"
+)
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
-def load_gex_data_from_databricks():
-    """
-    Load GEX pipeline results from Databricks table
-    """
-    
+st.title("🔧 GEX Databricks Connection Tester")
+
+# Connection test function
+@st.cache_resource
+def get_databricks_connection():
+    """Create and test Databricks connection"""
     try:
-        # METHOD 1: Using databricks-sql-connector (install: pip install databricks-sql-connector)
-        from databricks import sql
-        
         connection = sql.connect(
-            server_hostname=st.secrets["databricks"]["server_hostname"],  # Changed from hostname
-            http_path=st.secrets["databricks"]["http_path"], 
-            access_token=st.secrets["databricks"]["access_token"]          # Changed from token
+            server_hostname=st.secrets["databricks"]["server_hostname"],
+            http_path=st.secrets["databricks"]["http_path"],
+            access_token=st.secrets["databricks"]["access_token"]
         )
-        
+        return connection
+    except Exception as e:
+        st.error(f"❌ Connection failed: {str(e)}")
+        return None
+
+# Test queries
+def test_basic_query(connection):
+    """Test basic SQL functionality"""
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1 as test_value")
+        result = cursor.fetchone()
+        cursor.close()
+        return result[0] == 1
+    except Exception as e:
+        st.error(f"Basic query failed: {str(e)}")
+        return False
+
+def test_tables_exist(connection):
+    """Check if your GEX tables exist"""
+    tables_to_check = [
+        "gex_trading.scan_results",
+        "gex_trading.gamma_profiles", 
+        "gex_trading.trading_setups"
+    ]
+    
+    results = {}
+    cursor = connection.cursor()
+    
+    for table in tables_to_check:
+        try:
+            cursor.execute(f"DESCRIBE {table}")
+            columns = cursor.fetchall()
+            results[table] = {"exists": True, "columns": len(columns)}
+        except Exception as e:
+            results[table] = {"exists": False, "error": str(e)}
+    
+    cursor.close()
+    return results
+
+def fetch_recent_data(connection):
+    """Fetch your actual GEX scan data"""
+    try:
         cursor = connection.cursor()
         
-        # Get latest pipeline run
+        # Try your existing scan results table
         query = """
         SELECT *
-        FROM quant_projects.gex_trading.gex_pipeline_results
-        WHERE pipeline_date >= current_date() - INTERVAL 7 DAYS
-        ORDER BY run_timestamp DESC
-        LIMIT 100
+        FROM gex_trading.scan_results 
+        ORDER BY scan_timestamp DESC 
+        LIMIT 10
         """
         
         cursor.execute(query)
-        results = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
-        
+        results = cursor.fetchall()
         cursor.close()
-        connection.close()
         
-        if not results:
-            return None, "No recent data found"
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(results, columns=columns)
-        
-        # Get latest run data
-        latest_run_id = df['run_id'].iloc[0]
-        latest_data = df[df['run_id'] == latest_run_id]
-        
-        # Convert to dashboard format
-        dashboard_data = convert_table_data_to_dashboard_format(latest_data)
-        
-        return dashboard_data, "Connected to Databricks"
-        
-    except ImportError:
-        st.error("Install databricks-sql-connector: pip install databricks-sql-connector")
-        return None, "Missing connector"
-        
+        if results:
+            df = pd.DataFrame(results, columns=columns)
+            return df
+        else:
+            return pd.DataFrame()
+            
     except Exception as e:
-        st.error(f"Databricks connection failed: {e}")
-        return create_fallback_data(), "Using fallback data"
+        st.error(f"Data fetch failed: {str(e)}")
+        st.code(traceback.format_exc())
+        return pd.DataFrame()
 
-def convert_table_data_to_dashboard_format(df):
-    """Convert Databricks table data to dashboard format"""
+# Main testing interface
+def main():
+    st.sidebar.markdown("## Test Steps")
+    st.sidebar.markdown("""
+    1. **Connection** - Test basic connectivity
+    2. **Tables** - Verify GEX tables exist  
+    3. **Data** - Load recent scan results
+    4. **Display** - Show your actual data
+    """)
     
-    if df.empty:
-        return create_empty_dashboard_data()
+    # Step 1: Test connection
+    st.header("1️⃣ Connection Test")
     
-    # Get metadata from first row
-    first_row = df.iloc[0]
+    connection = get_databricks_connection()
     
-    # Filter approved setups
-    approved_setups = df[df['setup_approved'] == True]
-    
-    # Create trading setups
-    trading_setups = []
-    for _, row in approved_setups.iterrows():
-        if row['symbol'] != 'NO_SETUPS':
+    if connection:
+        st.success("✅ Successfully connected to Databricks!")
+        
+        # Step 2: Test basic query
+        st.header("2️⃣ Basic Query Test")
+        if test_basic_query(connection):
+            st.success("✅ Basic SQL queries working!")
+        else:
+            st.error("❌ Basic SQL queries failed")
+            return
+        
+        # Step 3: Check tables
+        st.header("3️⃣ Table Structure Test")
+        table_results = test_tables_exist(connection)
+        
+        for table, info in table_results.items():
+            if info["exists"]:
+                st.success(f"✅ {table} exists ({info['columns']} columns)")
+            else:
+                st.error(f"❌ {table} missing: {info['error']}")
+        
+        # Step 4: Fetch actual data
+        st.header("4️⃣ Data Loading Test")
+        
+        with st.spinner("Loading recent GEX data..."):
+            df = fetch_recent_data(connection)
+        
+        if not df.empty:
+            st.success(f"✅ Loaded {len(df)} records!")
             
-            # Map condition types
-            setup_type_mapping = {
-                'NEGATIVE_GEX': 'SQUEEZE_PLAY',
-                'HIGH_POSITIVE_GEX': 'PREMIUM_SELLING', 
-                'NEAR_FLIP': 'GAMMA_FLIP'
-            }
+            # Display the data
+            st.subheader("Recent Scan Results")
+            st.dataframe(df, use_container_width=True)
             
-            direction_mapping = {
-                'NEGATIVE_GEX': 'LONG_CALLS',
-                'HIGH_POSITIVE_GEX': 'SHORT_CALLS',
-                'NEAR_FLIP': 'VOLATILITY'
-            }
+            # Show data info
+            col1, col2 = st.columns(2)
             
-            setup_data = {
-                'setup': {
-                    'symbol': row['symbol'],
-                    'setup_type': setup_type_mapping.get(row['condition_type'], row['condition_type']),
-                    'direction': direction_mapping.get(row['condition_type'], 'DIRECTIONAL'),
-                    'confidence': row['confidence_score'],
-                    'reason': f"GEX: {row['net_gex']/1e9:+.1f}B, Distance: {row['distance_to_flip']:+.2f}% from flip",
-                    'expected_move': row['expected_move'],
-                    'hold_days': 3,
-                    'risk_level': 'MEDIUM' if row['confidence_score'] >= 80 else 'HIGH'
-                },
-                'position_size_percent': row['position_size_percent'],
-                'dollar_amount': int(row['position_size_percent'] * 1000),
-                'approved': row['setup_approved']
-            }
+            with col1:
+                st.metric("Records Found", len(df))
+                st.metric("Columns", len(df.columns))
             
-            trading_setups.append(setup_data)
+            with col2:
+                if 'scan_timestamp' in df.columns:
+                    latest_scan = df['scan_timestamp'].max()
+                    st.metric("Latest Scan", latest_scan)
+                
+                if 'symbol' in df.columns:
+                    unique_symbols = df['symbol'].nunique()
+                    st.metric("Unique Symbols", unique_symbols)
+            
+            # Show sample symbols if available
+            if 'symbol' in df.columns:
+                st.subheader("Sample Symbols Found")
+                symbols = df['symbol'].unique()[:10]
+                st.write(", ".join(symbols))
+        
+        else:
+            st.warning("⚠️ No data found. Your tables exist but may be empty.")
+            
+            # Show alternative query to debug
+            st.subheader("Debug: Try Manual Query")
+            
+            debug_query = st.text_area(
+                "Test your own query:", 
+                value="SHOW TABLES FROM gex_trading",
+                height=100
+            )
+            
+            if st.button("Run Debug Query"):
+                try:
+                    cursor = connection.cursor()
+                    cursor.execute(debug_query)
+                    results = cursor.fetchall()
+                    columns = [desc[0] for desc in cursor.description]
+                    
+                    if results:
+                        debug_df = pd.DataFrame(results, columns=columns)
+                        st.dataframe(debug_df)
+                    else:
+                        st.info("Query returned no results")
+                        
+                except Exception as e:
+                    st.error(f"Query failed: {str(e)}")
+        
+        connection.close()
     
-    # Calculate market summary
-    net_gex_values = df[df['symbol'] != 'NO_SETUPS']['net_gex'].tolist()
-    total_net_gex = sum(net_gex_values) / 1e9 if net_gex_values else 0
-    
-    # Count conditions
-    condition_counts = df['condition_type'].value_counts()
-    negative_count = condition_counts.get('NEGATIVE_GEX', 0)
-    positive_count = condition_counts.get('HIGH_POSITIVE_GEX', 0)
-    near_flip_count = condition_counts.get('NEAR_FLIP', 0)
-    
-    # Determine dominant regime
-    if negative_count > positive_count and negative_count > 0:
-        dominant_regime = 'NEGATIVE_GEX'
-        stress_level = 'HIGH'
-    elif positive_count > 0:
-        dominant_regime = 'HIGH_POSITIVE_GEX'
-        stress_level = 'LOW'
-    elif near_flip_count > 0:
-        dominant_regime = 'NEAR_FLIP'
-        stress_level = 'MEDIUM'
     else:
-        dominant_regime = 'NEUTRAL'
-        stress_level = 'LOW'
-    
-    return {
-        'success': True,
-        'analysis_time': pd.to_datetime(first_row['run_timestamp']),
-        'pipeline_run_time': first_row['run_timestamp'],
-        'symbols_analyzed': first_row['total_symbols_analyzed'],
-        'symbols_successful': first_row['total_symbols_analyzed'],
-        'trading_setups': trading_setups,
-        'market_summary': {
-            'total_net_gex_billions': total_net_gex,
-            'dominant_regime': dominant_regime,
-            'symbols_near_flip': near_flip_count,
-            'market_stress_level': stress_level,
-            'total_conditions_found': len(df[df['symbol'] != 'NO_SETUPS'])
-        },
-        'risk_assessment': {
-            'total_risk_percent': sum(s['position_size_percent'] for s in trading_setups),
-            'num_positions': len(trading_setups),
-            'risk_level': 'MEDIUM' if len(trading_setups) > 2 else 'LOW'
-        }
-    }
+        st.error("❌ Cannot proceed - fix connection first")
+        
+        # Show expected secrets format
+        st.subheader("Expected .streamlit/secrets.toml format:")
+        st.code("""
+[databricks]
+server_hostname = "your-workspace.cloud.databricks.com"
+http_path = "/sql/1.0/warehouses/your-warehouse-id" 
+access_token = "your-databricks-token"
+        """)
 
-def create_empty_dashboard_data():
-    """Create empty dashboard data structure"""
-    return {
-        'success': True,
-        'analysis_time': datetime.now(),
-        'symbols_analyzed': 0,
-        'trading_setups': [],
-        'market_summary': {
-            'total_net_gex_billions': 0,
-            'dominant_regime': 'NEUTRAL',
-            'symbols_near_flip': 0,
-            'market_stress_level': 'LOW'
-        },
-        'risk_assessment': {
-            'total_risk_percent': 0,
-            'num_positions': 0,
-            'risk_level': 'NONE'
-        }
-    }
-
-def create_fallback_data():
-    """Create fallback data if connection fails"""
-    return {
-        'success': False,
-        'error': 'Connection failed',
-        'analysis_time': datetime.now(),
-        'symbols_analyzed': 0,
-        'trading_setups': [],
-        'market_summary': {
-            'total_net_gex_billions': 0,
-            'dominant_regime': 'UNKNOWN',
-            'symbols_near_flip': 0,
-            'market_stress_level': 'UNKNOWN'
-        },
-        'risk_assessment': {
-            'total_risk_percent': 0,
-            'num_positions': 0,
-            'risk_level': 'UNKNOWN'
-        }
-    }
-
-# Add this to your main dashboard file
-def get_live_databricks_data():
-    """Main function to call from your dashboard"""
-    return load_gex_data_from_databricks()
+if __name__ == "__main__":
+    main()
