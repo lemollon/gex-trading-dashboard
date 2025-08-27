@@ -65,12 +65,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=300)
 def load_databricks_data():
-    """Load data from Databricks tables"""
+    """Load data from Databricks tables - ALWAYS RETURN DATA"""
+    
+    # Always show debug info
+    st.write("🔍 **Debug Info:**")
+    st.write(f"- DATABRICKS_AVAILABLE: {DATABRICKS_AVAILABLE}")
+    st.write(f"- Secrets available: {'databricks' in st.secrets}")
+    
     try:
         if DATABRICKS_AVAILABLE and "databricks" in st.secrets:
-            # Try to connect to real Databricks
+            st.write("📡 Attempting Databricks connection...")
+            
             connection = sql.connect(
                 server_hostname=st.secrets["databricks"]["server_hostname"],
                 http_path=st.secrets["databricks"]["http_path"],
@@ -94,6 +100,9 @@ def load_databricks_data():
             cursor.close()
             connection.close()
             
+            st.success("✅ Connected to Databricks successfully!")
+            st.write(f"📊 Found {len(recommendations_df)} recommendations")
+            
             return {
                 'recommendations': recommendations_df,
                 'status': 'connected',
@@ -101,9 +110,12 @@ def load_databricks_data():
             }
             
     except Exception as e:
-        st.warning(f"Databricks connection failed: {str(e)}")
+        st.warning(f"⚠️ Databricks connection failed: {str(e)}")
+        st.write("🔄 Loading fallback data...")
     
-    # Fallback data
+    # ALWAYS create fallback data - this was the issue!
+    st.info("📋 Loading sample data for demonstration")
+    
     recommendations = pd.DataFrame([
         {
             'symbol': 'AMC',
@@ -117,7 +129,7 @@ def load_databricks_data():
             'created_timestamp': datetime.now() - timedelta(hours=2)
         },
         {
-            'symbol': 'TSLA',
+            'symbol': 'TSLA', 
             'setup_type': 'PREMIUM_SELLING',
             'confidence_score': 88,
             'entry_price': 245.30,
@@ -129,7 +141,7 @@ def load_databricks_data():
         },
         {
             'symbol': 'PLTR',
-            'setup_type': 'GAMMA_FLIP_PLAY',
+            'setup_type': 'GAMMA_FLIP_PLAY', 
             'confidence_score': 75,
             'entry_price': 28.90,
             'target_price': 32.00,
@@ -137,8 +149,32 @@ def load_databricks_data():
             'market_regime': 'NEUTRAL_GEX',
             'position_size': '2%',
             'created_timestamp': datetime.now() - timedelta(hours=3)
+        },
+        {
+            'symbol': 'GME',
+            'setup_type': 'SQUEEZE_PLAY',
+            'confidence_score': 89,
+            'entry_price': 25.80,
+            'target_price': 30.00,
+            'net_gex': -0.8e9,
+            'market_regime': 'NEGATIVE_GEX',
+            'position_size': '2.5%',
+            'created_timestamp': datetime.now() - timedelta(hours=4)
+        },
+        {
+            'symbol': 'NVDA',
+            'setup_type': 'PREMIUM_SELLING',
+            'confidence_score': 82,
+            'entry_price': 890.50,
+            'target_price': 880.00,
+            'net_gex': 1.5e9,
+            'market_regime': 'POSITIVE_GEX',
+            'position_size': '1.5%',
+            'created_timestamp': datetime.now() - timedelta(hours=5)
         }
     ])
+    
+    st.write(f"✅ Fallback data loaded: {len(recommendations)} recommendations")
     
     return {
         'recommendations': recommendations,
