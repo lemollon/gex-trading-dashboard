@@ -329,13 +329,38 @@ def main():
         st.warning("⚠️ No trading setups found matching your criteria")
         
         # Show debug info
-        with st.expander("🔍 Debug Information"):
+        with st.expander("Debug Information"):
             st.write("Raw scan results shape:", scan_df.shape if not scan_df.empty else "No data")
             if not scan_df.empty:
                 st.write("Sample data:")
                 st.dataframe(scan_df.head(3))
+                st.write("Columns:", list(scan_df.columns))
             
             st.write("Portfolio stats:", portfolio_stats)
+            
+            # Test direct query to your table
+            st.subheader("Direct Table Query Test")
+            try:
+                connection = get_databricks_connection()
+                if connection:
+                    cursor = connection.cursor()
+                    test_query = """
+                    SELECT COUNT(*) as total_count, 
+                           MAX(analysis_timestamp) as latest_timestamp
+                    FROM quant_projects.gex_trading.scheduled_pipeline_results 
+                    WHERE analysis_date >= current_date() - interval 1 day
+                    """
+                    cursor.execute(test_query)
+                    result = cursor.fetchone()
+                    if result:
+                        st.write(f"Direct query result: {result[0]} records, latest: {result[1]}")
+                    else:
+                        st.write("Direct query returned no results")
+                    cursor.close()
+                else:
+                    st.write("No database connection for direct query")
+            except Exception as e:
+                st.write(f"Direct query failed: {str(e)}")
     
     # Footer
     st.markdown("---")
