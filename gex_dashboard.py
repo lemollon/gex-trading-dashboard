@@ -121,9 +121,9 @@ def fetch_portfolio_stats():
             COUNT(*) as total_symbols,
             COUNT(CASE WHEN confidence_score >= 70 THEN 1 END) as high_confidence,
             AVG(confidence_score) as avg_confidence,
-            MAX(run_timestamp) as last_scan
+            MAX(analysis_timestamp) as last_scan
         FROM quant_projects.gex_trading.scheduled_pipeline_results 
-        WHERE pipeline_date >= current_date() - interval 1 day
+        WHERE analysis_date >= current_date() - interval 1 day
         """
         
         cursor.execute(query)
@@ -310,8 +310,8 @@ def main():
             display_df['net_gex'] = display_df['net_gex'].apply(lambda x: f"{x/1e9:.2f}B" if abs(x) > 1e6 else f"{x/1e6:.1f}M")
         
         st.dataframe(
-            display_df[['symbol', 'setup_type', 'confidence_score', 'net_gex', 
-                       'distance_to_flip_pct', 'pipeline_date']],
+            display_df[['symbol', 'setup_type', 'confidence_score', 'current_price', 
+                       'gamma_flip_point', 'distance_to_flip_pct', 'category']],
             use_container_width=True
         )
         
