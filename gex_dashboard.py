@@ -64,12 +64,12 @@ def load_databricks_data():
             
             cursor = connection.cursor()
             
-            # Query using YOUR ACTUAL table structure - GET ALL DATA
+            # Query using the ACTUAL column names from your table
             cursor.execute("""
                 SELECT 
                     run_id,
                     symbol,
-                    structure_type as setup_type,
+                    condition_type as setup_type,
                     confidence_score,
                     spot_price as entry_price,
                     gamma_flip_point as target_price,
