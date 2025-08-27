@@ -1,4 +1,17 @@
-"""
+# Query recommendations - REMOVE DATE FILTER (this was the issue!)
+            st.write("📡 Querying recommendations table...")
+            cursor.execute("""
+                SELECT * FROM quant_projects.gex_trading.gex_recommendations
+                ORDER BY created_timestamp DESC
+                LIMIT 50
+            """)
+            
+            recommendations = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            recommendations_df = pd.DataFrame(recommendations, columns=columns)
+            
+            st.write(f"📊 Found {len(recommendations_df)} recommendations from Databricks")
+                    """
 🚀 GEX Trading Dashboard - Simplified Working Version
 Based on your working foundation, simplified for reliability
 """
