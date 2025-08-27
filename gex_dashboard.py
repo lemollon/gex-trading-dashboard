@@ -1,4 +1,27 @@
-import streamlit as st
+# Initialize session state with missing features
+if 'initialized' not in st.session_state:
+    st.session_state.initialized = True
+    st.session_state.auto_refresh = False
+    st.session_state.alert_settings = {
+        'high_priority': True,
+        'medium_priority': True,
+        'low_priority': False
+    }
+    st.session_state.last_update = datetime.now()
+    
+    # Enhanced Portfolio Data with 100+ trades tracking
+    st.session_state.portfolio_data = {
+        'total_value': 125847.50,
+        'day_pnl': 2847.33,
+        'positions': 7,
+        'win_rate': 73.2,
+        'sharpe_ratio': 1.87,
+        'max_drawdown': -4.2,
+        'total_trades': 147,  # 100+ trades count
+        'winning_trades': 108,
+        'losing_trades': 39,
+        'avg_win': 485.23,
+        'avg_loss':import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -19,7 +42,7 @@ st.set_page_config(
     page_title="🚀 GEX Trading Command Center",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded",  # Force sidebar to be open
     menu_items={
         'Get Help': 'https://github.com/your-repo/gex-dashboard',
         'Report a bug': "https://github.com/your-repo/gex-dashboard/issues",
@@ -43,11 +66,33 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Main container styling */
+    /* Force sidebar visibility */
+    .css-1d391kg, .css-1cypcdb, .css-17eq0hr {
+        display: block !important;
+        visibility: visible !important;
+    }
+    
+    /* Sidebar toggle button styling */
+    button[title="View fullscreen"] {
+        display: none !important;
+    }
+    
+    /* Main container styling - Fixed dark background with readable text */
     .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #1e293b 75%, #0f172a 100%);
+        background: linear-gradient(135deg, #1a202c 0%, #2d3748 25%, #4a5568 50%, #2d3748 75%, #1a202c 100%);
         background-size: 400% 400%;
         animation: gradientShift 15s ease infinite;
+        color: #ffffff !important;
+    }
+    
+    /* Ensure all text is readable */
+    .stApp, .stApp * {
+        color: #ffffff !important;
+    }
+    
+    /* Override Streamlit's default text colors */
+    .stMarkdown, .stMarkdown *, .stText, .stText *, p, span, div {
+        color: #ffffff !important;
     }
     
     @keyframes gradientShift {
@@ -110,18 +155,19 @@ st.markdown("""
         opacity: 0.8;
     }
     
-    /* Enhanced Metric Cards */
+    /* Enhanced Metric Cards - Better contrast */
     .metric-card {
-        background: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(59, 130, 246, 0.2);
+        background: rgba(45, 55, 72, 0.95);
+        backdrop-filter: blur(15px);
+        border: 2px solid rgba(96, 165, 250, 0.4);
         border-radius: 16px;
         padding: 24px;
         margin: 8px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
+        color: #ffffff !important;
     }
     
     .metric-card::before {
@@ -141,26 +187,28 @@ st.markdown("""
     
     .metric-card:hover {
         transform: translateY(-8px) scale(1.02);
-        border-color: rgba(59, 130, 246, 0.4);
-        box-shadow: 0 20px 40px rgba(59, 130, 246, 0.2);
+        border-color: rgba(96, 165, 250, 0.6);
+        box-shadow: 0 20px 50px rgba(59, 130, 246, 0.3);
     }
     
     .metric-value {
-        font-size: 2.5rem;
-        font-weight: 700;
+        font-size: 2.8rem;
+        font-weight: 800;
         margin-bottom: 8px;
-        background: linear-gradient(135deg, #ffffff, #e2e8f0);
+        background: linear-gradient(135deg, #ffffff, #60a5fa);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
     
     .metric-label {
-        color: #94a3b8;
-        font-size: 0.9rem;
-        font-weight: 500;
+        color: #cbd5e1 !important;
+        font-size: 1rem;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
+        margin-bottom: 4px;
     }
     
     .metric-change {
@@ -184,43 +232,58 @@ st.markdown("""
         background: rgba(245, 158, 11, 0.1);
     }
     
-    /* Enhanced Alert System */
+    /* Enhanced Alert System - Better visibility */
     .alert-container {
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.3);
+        background: rgba(45, 55, 72, 0.95);
+        border: 2px solid rgba(239, 68, 68, 0.5);
         border-radius: 12px;
-        padding: 16px;
+        padding: 20px;
         margin: 16px 0;
         animation: alertPulse 2s ease-in-out infinite;
+        color: #ffffff !important;
+        backdrop-filter: blur(10px);
     }
     
     @keyframes alertPulse {
-        0%, 100% { border-color: rgba(239, 68, 68, 0.3); }
-        50% { border-color: rgba(239, 68, 68, 0.6); }
+        0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
+        50% { border-color: rgba(239, 68, 68, 0.8); }
     }
     
-    .alert-high { border-color: #ef4444; background: rgba(239, 68, 68, 0.15); }
-    .alert-medium { border-color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
-    .alert-low { border-color: #10b981; background: rgba(16, 185, 129, 0.15); }
+    .alert-high { 
+        border-color: #ef4444; 
+        background: rgba(239, 68, 68, 0.2); 
+        color: #ffffff !important;
+    }
+    .alert-medium { 
+        border-color: #f59e0b; 
+        background: rgba(245, 158, 11, 0.2); 
+        color: #ffffff !important;
+    }
+    .alert-low { 
+        border-color: #10b981; 
+        background: rgba(16, 185, 129, 0.2); 
+        color: #ffffff !important;
+    }
     
-    /* Setup Cards */
+    /* Setup Cards - Improved readability */
     .setup-card {
-        background: rgba(30, 41, 59, 0.8);
-        backdrop-filter: blur(15px);
-        border: 1px solid rgba(59, 130, 246, 0.3);
+        background: rgba(45, 55, 72, 0.95);
+        backdrop-filter: blur(20px);
+        border: 2px solid rgba(96, 165, 250, 0.4);
         border-radius: 20px;
         padding: 32px;
-        margin: 16px 0;
-        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+        margin: 20px 0;
+        box-shadow: 0 16px 56px rgba(0, 0, 0, 0.5);
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
+        color: #ffffff !important;
     }
     
     .setup-card:hover {
         transform: translateY(-12px);
-        border-color: rgba(59, 130, 246, 0.5);
-        box-shadow: 0 24px 64px rgba(59, 130, 246, 0.3);
+        border-color: rgba(96, 165, 250, 0.7);
+        box-shadow: 0 28px 72px rgba(59, 130, 246, 0.4);
     }
     
     /* Progress Bars */
@@ -257,22 +320,66 @@ st.markdown("""
         100% { left: 100%; }
     }
     
-    /* Button Enhancements */
+    /* Button Enhancements - Consistent styling */
     .stButton > button {
-        background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
-        border: none !important;
+        background: linear-gradient(135deg, #3b82f6, #60a5fa) !important;
+        border: 2px solid rgba(96, 165, 250, 0.5) !important;
         border-radius: 12px !important;
         color: white !important;
         font-weight: 600 !important;
-        padding: 12px 24px !important;
+        padding: 14px 28px !important;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3) !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
     }
     
     .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4) !important;
-        background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 12px 28px rgba(59, 130, 246, 0.4) !important;
+        background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+        border-color: rgba(96, 165, 250, 0.8) !important;
+    }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: rgba(45, 55, 72, 0.5);
+        border-radius: 12px;
+        padding: 8px;
+        border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        padding: 12px 24px;
+        background: rgba(59, 130, 246, 0.1);
+        border-radius: 8px;
+        color: #cbd5e1 !important;
+        border: 1px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #3b82f6, #60a5fa) !important;
+        color: #ffffff !important;
+        border-color: rgba(96, 165, 250, 0.5);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+    }
+    
+    /* Loading Animation */
+    .loading-spinner {
+        border: 3px solid rgba(96, 165, 250, 0.3);
+        border-top: 3px solid #60a5fa;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
     }
     
     .execute-button {
@@ -299,10 +406,47 @@ st.markdown("""
         .setup-card { padding: 16px; }
     }
     
-    /* Sidebar Enhancements */
-    .css-1d391kg {
-        background: rgba(15, 23, 42, 0.9) !important;
+    /* Sidebar Enhancements - Cohesive design */
+    .css-1d391kg, .css-1cypcdb, .css-17eq0hr, .css-6qob1r, .css-1aumxhk {
+        background: linear-gradient(180deg, #2d3748 0%, #4a5568 50%, #2d3748 100%) !important;
         backdrop-filter: blur(10px) !important;
+        border-right: 2px solid rgba(59, 130, 246, 0.3) !important;
+        color: #ffffff !important;
+    }
+    
+    /* Sidebar content styling */
+    .css-1d391kg *, .css-1cypcdb *, .css-17eq0hr *, .css-6qob1r *, .css-1aumxhk * {
+        color: #ffffff !important;
+    }
+    
+    /* Sidebar headers */
+    .css-1d391kg h3, .css-1cypcdb h3, .css-17eq0hr h3 {
+        color: #60a5fa !important;
+        border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+        padding-bottom: 8px;
+        margin-bottom: 16px;
+    }
+    
+    /* Sidebar selectbox and inputs */
+    .css-1d391kg .stSelectbox, .css-1d391kg .stSlider, .css-1d391kg .stCheckbox {
+        background: rgba(59, 130, 246, 0.1) !important;
+        border-radius: 8px;
+        padding: 4px;
+        margin: 4px 0;
+    }
+    
+    /* Sidebar selectbox labels */
+    .css-1d391kg .stSelectbox label, .css-1d391kg .stSlider label, .css-1d391kg .stCheckbox label {
+        color: #cbd5e1 !important;
+        font-weight: 500;
+    }
+    
+    /* Ensure sidebar toggle button is visible */
+    .css-14xtw13.e8zbici0 {
+        background: #3b82f6 !important;
+        color: white !important;
+        border-radius: 8px;
+        border: none !important;
     }
     
     /* Chart Container */
@@ -354,11 +498,53 @@ if 'initialized' not in st.session_state:
     }
 
 class GEXDataManager:
-    """Enhanced data manager with advanced calculations"""
+    """Enhanced data manager with advanced calculations and custom symbol support"""
     
     def __init__(self):
         self.symbols = ['SPY', 'QQQ', 'IWM', 'DIA', 'TSLA', 'AAPL', 'MSFT', 'NVDA']
+        self.custom_symbols = set()  # Track custom symbols
+        self.data = {}
         self.refresh_data()
+    
+    def add_custom_symbol(self, symbol: str) -> bool:
+        """Add a custom symbol and generate data for it"""
+        symbol = symbol.upper().strip()
+        
+        # Basic validation
+        if len(symbol) < 1 or len(symbol) > 5:
+            return False
+        
+        # Check if symbol contains only letters
+        if not symbol.isalpha():
+            return False
+        
+        # Add to custom symbols and generate data
+        self.custom_symbols.add(symbol)
+        if symbol not in self.symbols:
+            self.symbols.append(symbol)
+        
+        # Generate data for the new symbol
+        self.data[symbol] = self._generate_symbol_data(symbol)
+        return True
+    
+    def get_symbol_info(self, symbol: str) -> Dict:
+        """Get basic symbol information (mock for now, could integrate with real API)"""
+        symbol_info = {
+            'SPY': {'name': 'SPDR S&P 500 ETF', 'sector': 'ETF', 'market_cap': '500B+'},
+            'QQQ': {'name': 'Invesco QQQ ETF', 'sector': 'ETF', 'market_cap': '200B+'},
+            'IWM': {'name': 'iShares Russell 2000 ETF', 'sector': 'ETF', 'market_cap': '50B+'},
+            'DIA': {'name': 'SPDR Dow Jones Industrial Average ETF', 'sector': 'ETF', 'market_cap': '30B+'},
+            'TSLA': {'name': 'Tesla Inc', 'sector': 'Automotive', 'market_cap': '800B+'},
+            'AAPL': {'name': 'Apple Inc', 'sector': 'Technology', 'market_cap': '3T+'},
+            'MSFT': {'name': 'Microsoft Corporation', 'sector': 'Technology', 'market_cap': '2.5T+'},
+            'NVDA': {'name': 'NVIDIA Corporation', 'sector': 'Technology', 'market_cap': '1.5T+'}
+        }
+        
+        return symbol_info.get(symbol, {
+            'name': f'{symbol} Corporation',
+            'sector': 'Unknown',
+            'market_cap': 'N/A'
+        })
     
     def refresh_data(self):
         """Generate enhanced mock data with realistic GEX calculations"""
@@ -368,20 +554,42 @@ class GEXDataManager:
     
     def _generate_symbol_data(self, symbol: str) -> Dict:
         """Generate realistic GEX data for a symbol"""
-        np.random.seed(hash(symbol) % 100)  # Consistent data per symbol
+        # Use symbol hash for consistent data per symbol
+        np.random.seed(hash(symbol) % 1000)  
         
-        # Base price ranges per symbol
-        price_ranges = {
-            'SPY': (440, 460), 'QQQ': (370, 390), 'IWM': (180, 200),
-            'DIA': (340, 360), 'TSLA': (180, 220), 'AAPL': (150, 180),
-            'MSFT': (380, 420), 'NVDA': (800, 900)
-        }
+        # Base price ranges per symbol type
+        if symbol in ['SPY', 'QQQ', 'IWM', 'DIA']:
+            # ETF price ranges
+            price_ranges = {
+                'SPY': (440, 460), 'QQQ': (370, 390), 
+                'IWM': (180, 200), 'DIA': (340, 360)
+            }
+            base_price = np.random.uniform(*price_ranges.get(symbol, (100, 200)))
+        elif symbol in ['TSLA', 'AAPL', 'MSFT', 'NVDA']:
+            # Popular stock ranges
+            price_ranges = {
+                'TSLA': (180, 220), 'AAPL': (150, 180),
+                'MSFT': (380, 420), 'NVDA': (800, 900)
+            }
+            base_price = np.random.uniform(*price_ranges.get(symbol, (50, 300)))
+        else:
+            # Generic stock range for custom symbols
+            base_price = np.random.uniform(20, 500)
         
-        base_price = np.random.uniform(*price_ranges.get(symbol, (100, 200)))
-        
-        # Generate strike ladder
-        strikes = np.arange(base_price * 0.85, base_price * 1.15, base_price * 0.01)
-        strikes = np.round(strikes / 0.5) * 0.5  # Round to nearest 0.50
+        # Generate more realistic strike ladder based on price
+        if base_price < 50:
+            strike_increment = 0.5
+        elif base_price < 200:
+            strike_increment = 1.0
+        else:
+            strike_increment = 5.0
+            
+        strikes = np.arange(
+            base_price * 0.85, 
+            base_price * 1.15, 
+            strike_increment
+        )
+        strikes = np.round(strikes / strike_increment) * strike_increment
         
         profiles = []
         net_gex = 0
@@ -391,20 +599,27 @@ class GEXDataManager:
         for strike in strikes:
             # Generate realistic OI and gamma patterns
             distance_from_atm = abs(strike - base_price) / base_price
-            oi_multiplier = np.exp(-20 * distance_from_atm)  # Higher OI near ATM
+            oi_multiplier = np.exp(-25 * distance_from_atm)  # Higher OI near ATM
+            
+            # Volatility factor based on symbol type
+            vol_factor = 1.5 if symbol in ['TSLA', 'NVDA'] else 1.0
             
             if strike < base_price:  # Put strikes
-                oi = int(np.random.exponential(15000) * oi_multiplier)
-                gamma = np.random.uniform(-2000, -100)
-                gex = gamma * oi * 0.01 * strike
+                oi = int(np.random.exponential(15000 * vol_factor) * oi_multiplier)
+                gamma_strength = np.random.uniform(100, 2000 * vol_factor)
+                gamma = -gamma_strength  # Puts have negative gamma for dealers
+                gex = gamma * oi * 0.01 * strike / 100  # Scaled for readability
                 profile_type = 'put'
+                
             elif strike > base_price:  # Call strikes  
-                oi = int(np.random.exponential(12000) * oi_multiplier)
-                gamma = np.random.uniform(100, 1500)
-                gex = gamma * oi * 0.01 * strike
+                oi = int(np.random.exponential(12000 * vol_factor) * oi_multiplier)
+                gamma_strength = np.random.uniform(100, 1800 * vol_factor)
+                gamma = gamma_strength  # Calls have positive gamma for dealers
+                gex = gamma * oi * 0.01 * strike / 100  # Scaled for readability
                 profile_type = 'call'
-            else:  # ATM
-                oi = int(np.random.uniform(20000, 40000))
+                
+            else:  # ATM (closest strike)
+                oi = int(np.random.uniform(20000, 50000))
                 gamma = 0
                 gex = 0
                 profile_type = 'flip'
@@ -412,48 +627,63 @@ class GEXDataManager:
             cumulative_gex += gex
             net_gex += gex
             
-            # Find gamma flip point
-            if gamma_flip is None and cumulative_gex >= 0:
-                gamma_flip = strike
+            # Find gamma flip point (where cumulative crosses zero)
+            if gamma_flip is None and len(profiles) > 0:
+                if (profiles[-1]['cumulative'] <= 0 and cumulative_gex > 0) or \
+                   (profiles[-1]['cumulative'] >= 0 and cumulative_gex < 0):
+                    gamma_flip = strike
             
             profiles.append({
-                'strike': strike,
-                'gex': gex / 1e6,  # Convert to millions
-                'cumulative': cumulative_gex / 1e6,
-                'oi': oi,
-                'gamma': gamma,
+                'strike': round(strike, 2),
+                'gex': round(gex / 1e6, 2),  # Convert to millions for display
+                'cumulative': round(cumulative_gex / 1e6, 2),
+                'oi': max(1, oi),  # Ensure minimum OI
+                'gamma': round(gamma, 2),
                 'type': profile_type
             })
         
+        # Set gamma flip to middle strike if not found
+        if gamma_flip is None:
+            gamma_flip = base_price
+        
         # Identify key levels
-        put_walls = sorted([p for p in profiles if p['type'] == 'put'], 
-                          key=lambda x: abs(x['gex']), reverse=True)[:3]
-        call_walls = sorted([p for p in profiles if p['type'] == 'call'], 
-                           key=lambda x: x['gex'], reverse=True)[:3]
+        put_walls = [p for p in profiles if p['type'] == 'put' and p['gex'] < -0.1]
+        call_walls = [p for p in profiles if p['type'] == 'call' and p['gex'] > 0.1]
+        
+        put_walls = sorted(put_walls, key=lambda x: abs(x['gex']), reverse=True)[:3]
+        call_walls = sorted(call_walls, key=lambda x: x['gex'], reverse=True)[:3]
         
         # Determine regime and confidence
         regime = 'Negative Gamma' if net_gex < 0 else 'Positive Gamma'
         volatility_mode = 'Amplification' if net_gex < 0 else 'Suppression'
         
-        # Calculate confidence score based on multiple factors
+        # Enhanced confidence calculation
         wall_strength = sum(abs(p['gex']) for p in put_walls + call_walls)
-        distance_to_flip = abs(base_price - (gamma_flip or base_price)) / base_price
-        confidence = min(95, 40 + wall_strength * 5 + (1 - distance_to_flip) * 30)
+        distance_to_flip = abs(base_price - gamma_flip) / base_price
+        gex_magnitude = abs(net_gex / 1e9)  # Billions
+        
+        confidence = min(95, max(20, 
+            30 +  # Base confidence
+            wall_strength * 8 +  # Wall strength factor
+            (1 - distance_to_flip) * 25 +  # Distance to flip factor
+            gex_magnitude * 15  # GEX magnitude factor
+        ))
         
         return {
             'symbol': symbol,
             'price': round(base_price, 2),
             'net_gex': round(net_gex / 1e9, 2),  # Billions
-            'gamma_flip': round(gamma_flip or base_price, 2),
-            'call_wall': call_walls[0]['strike'] if call_walls else base_price * 1.05,
-            'put_support': put_walls[0]['strike'] if put_walls else base_price * 0.95,
+            'gamma_flip': round(gamma_flip, 2),
+            'call_wall': call_walls[0]['strike'] if call_walls else round(base_price * 1.05, 2),
+            'put_support': put_walls[0]['strike'] if put_walls else round(base_price * 0.95, 2),
             'regime': regime,
             'volatility_mode': volatility_mode,
             'confidence': round(confidence, 1),
             'profiles': profiles,
             'put_walls': put_walls,
             'call_walls': call_walls,
-            'setups': self._generate_setups(symbol, net_gex, base_price, gamma_flip, confidence)
+            'setups': self._generate_setups(symbol, net_gex, base_price, gamma_flip, confidence),
+            'symbol_info': self.get_symbol_info(symbol)
         }
     
     def _generate_setups(self, symbol: str, net_gex: float, price: float, 
@@ -849,49 +1079,136 @@ def get_alert_system():
 data_manager = get_data_manager()
 alert_system = get_alert_system()
 
-# Main App Header
-st.markdown("""
+# Main App Header with symbol indicator
+current_symbol_display = selected_symbol if 'selected_symbol' in locals() else 'SPY'
+
+st.markdown(f"""
 <div class="main-header">🚀 GEX TRADING COMMAND CENTER</div>
 <div class="sub-header">Professional Gamma Exposure Analysis & Trading Platform</div>
+<div style="text-align: center; margin-bottom: 2rem;">
+    <span style="background: linear-gradient(135deg, #3b82f6, #60a5fa); color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 1.1em;">
+        📊 Currently Analyzing: {current_symbol_display}
+    </span>
+</div>
 """, unsafe_allow_html=True)
 
-# Sidebar Configuration
+# Sidebar Configuration - Enhanced visibility
+st.sidebar.markdown("""
+<style>
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, #2d3748 0%, #4a5568 50%, #2d3748 100%);
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 with st.sidebar:
-    st.markdown("### ⚙️ **Trading Controls**")
+    # Add a visual header for the sidebar
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #3b82f6, #60a5fa); padding: 20px; margin: -20px -20px 20px -20px; text-align: center; border-radius: 0 0 16px 16px;">
+        <h2 style="color: white; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">⚙️ Trading Controls</h2>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Symbol Selection
-    selected_symbol = st.selectbox(
-        "📊 Select Symbol",
-        options=data_manager.symbols,
-        index=0,
-        help="Choose the symbol for GEX analysis"
+    # Symbol Selection with custom input
+    st.markdown("### 📊 **Symbol Selection**")
+    
+    # Toggle between preset and custom
+    symbol_mode = st.radio(
+        "**Selection Mode**",
+        ["📋 Preset Symbols", "✏️ Custom Symbol"],
+        horizontal=True
     )
+    
+    if symbol_mode == "📋 Preset Symbols":
+        selected_symbol = st.selectbox(
+            "**Choose Symbol**",
+            options=[sym for sym in data_manager.symbols if sym not in data_manager.custom_symbols],
+            index=0,
+            help="Choose from popular symbols for GEX analysis"
+        )
+    else:
+        # Custom symbol input
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            custom_symbol = st.text_input(
+                "**Enter Symbol**",
+                placeholder="e.g., AMZN, GOOGL, META",
+                help="Enter any stock symbol for analysis"
+            ).upper().strip()
+        
+        with col2:
+            if st.button("➕", help="Add Symbol", use_container_width=True):
+                if custom_symbol:
+                    with st.spinner(f"Analyzing {custom_symbol}..."):
+                        success = data_manager.add_custom_symbol(custom_symbol)
+                        if success:
+                            st.success(f"✅ {custom_symbol} added!")
+                            selected_symbol = custom_symbol
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid symbol format")
+                else:
+                    st.warning("Please enter a symbol")
+        
+        # Show custom symbols if any exist
+        if data_manager.custom_symbols:
+            st.markdown("**Custom Symbols:**")
+            custom_symbols_list = list(data_manager.custom_symbols)
+            selected_symbol = st.selectbox(
+                "**Select Custom Symbol**",
+                options=custom_symbols_list,
+                help="Choose from your custom symbols"
+            )
+        else:
+            selected_symbol = 'SPY'  # Default if no custom symbols
+    
+    # Display symbol info
+    if selected_symbol in data_manager.data:
+        symbol_info = data_manager.data[selected_symbol]['symbol_info']
+        st.markdown(f"""
+        <div style="background: rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 8px; margin: 8px 0; border: 1px solid rgba(96, 165, 250, 0.3);">
+            <div style="color: #60a5fa; font-weight: bold; font-size: 1.1em;">{selected_symbol}</div>
+            <div style="color: #cbd5e1; font-size: 0.9em;">{symbol_info.get('name', 'Unknown Company')}</div>
+            <div style="color: #94a3b8; font-size: 0.8em;">{symbol_info.get('sector', 'Unknown')} • {symbol_info.get('market_cap', 'N/A')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
     
     # Auto-refresh toggle
     auto_refresh = st.toggle(
-        "🔄 Auto Refresh",
+        "🔄 **Auto Refresh Data**",
         value=st.session_state.auto_refresh,
         help="Enable automatic data refresh every 30 seconds"
     )
     st.session_state.auto_refresh = auto_refresh
     
+    if auto_refresh:
+        st.success("✅ Auto-refresh enabled")
+    else:
+        st.info("⏸️ Manual refresh mode")
+    
+    st.markdown("---")
+    
     # Alert Settings
-    st.markdown("### 🚨 **Alert Settings**")
+    st.markdown("### 🚨 **Alert Configuration**")
     
     high_priority_alerts = st.checkbox(
-        "High Priority Alerts",
+        "🔴 **High Priority Alerts**",
         value=st.session_state.alert_settings['high_priority'],
         help="Extreme GEX levels, gamma flip proximity"
     )
     
     medium_priority_alerts = st.checkbox(
-        "Medium Priority Alerts", 
+        "🟡 **Medium Priority Alerts**", 
         value=st.session_state.alert_settings['medium_priority'],
         help="High confidence setups, wall breaches"
     )
     
     low_priority_alerts = st.checkbox(
-        "Low Priority Alerts",
+        "🟢 **Low Priority Alerts**",
         value=st.session_state.alert_settings['low_priority'],
         help="General market updates, minor changes"
     )
@@ -902,16 +1219,24 @@ with st.sidebar:
         'low_priority': low_priority_alerts
     }
     
+    st.markdown("---")
+    
     # Manual refresh button
-    if st.button("🔄 **Refresh Data**", type="primary"):
-        data_manager.refresh_data()
+    if st.button("🔄 **Refresh All Data**", type="primary", use_container_width=True):
+        with st.spinner("Refreshing data..."):
+            data_manager.refresh_data()
+            time.sleep(1)  # Brief pause for UX
+        st.success("✅ Data refreshed!")
+        time.sleep(2)
         st.rerun()
     
+    st.markdown("---")
+    
     # Risk Management Settings
-    st.markdown("### ⚖️ **Risk Settings**")
+    st.markdown("### ⚖️ **Risk Management**")
     
     max_position_size = st.slider(
-        "Max Position Size (%)",
+        "**Max Position Size (%)**",
         min_value=1,
         max_value=10,
         value=3,
@@ -919,7 +1244,7 @@ with st.sidebar:
     )
     
     profit_target = st.slider(
-        "Profit Target (%)",
+        "**Profit Target (%)**",
         min_value=25,
         max_value=200,
         value=100,
@@ -927,12 +1252,91 @@ with st.sidebar:
     )
     
     stop_loss = st.slider(
-        "Stop Loss (%)", 
+        "**Stop Loss (%)**", 
         min_value=25,
         max_value=75,
         value=50,
         help="Default stop loss for all positions"
     )
+    
+    st.markdown("---")
+    
+    # Analysis history for custom symbols
+    if data_manager.custom_symbols:
+        st.markdown("### 📈 **Custom Symbol Analysis History**")
+        
+        # Create a comparison table
+        comparison_data = []
+        for symbol in sorted(data_manager.custom_symbols):
+            if symbol in data_manager.data:
+                data = data_manager.data[symbol]
+                comparison_data.append({
+                    'Symbol': symbol,
+                    'Price': f"${data['price']:.2f}",
+                    'Net GEX': f"{data['net_gex']:.2f}B",
+                    'Regime': data['regime'],
+                    'Confidence': f"{data['confidence']:.0f}%",
+                    'Setups': len(data['setups'])
+                })
+        
+        if comparison_data:
+            df_comparison = pd.DataFrame(comparison_data)
+            
+            st.markdown("""
+            <div style="background: rgba(45, 55, 72, 0.8); padding: 20px; border-radius: 16px; border: 2px solid rgba(96, 165, 250, 0.3);">
+            """, unsafe_allow_html=True)
+            
+            st.dataframe(
+                df_comparison,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                    "Price": st.column_config.TextColumn("Price", width="small"),
+                    "Net GEX": st.column_config.TextColumn("Net GEX", width="medium"),
+                    "Regime": st.column_config.TextColumn("Regime", width="medium"),
+                    "Confidence": st.column_config.TextColumn("Confidence", width="small"),
+                    "Setups": st.column_config.NumberColumn("Setups", width="small")
+                }
+            )
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Quick switch buttons
+            st.markdown("**🔄 Quick Symbol Switch:**")
+            cols = st.columns(min(4, len(data_manager.custom_symbols)))
+            for i, symbol in enumerate(sorted(data_manager.custom_symbols)):
+                if i < len(cols):
+                    with cols[i]:
+                        if st.button(f"📊 {symbol}", key=f"switch_{symbol}", use_container_width=True):
+                            st.session_state.selected_symbol = symbol
+                            st.rerun()
+    
+    st.markdown("---")
+    
+    # Risk Management Section
+    st.markdown("### ⚖️ **Risk Management Guidelines**")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"""
+        <div style="background: rgba(45, 55, 72, 0.8); padding: 20px; border-radius: 12px; border: 2px solid rgba(16, 185, 129, 0.3);">
+            <h4 style="color: #10b981; margin-bottom: 12px;">✅ Position Sizing for {current_data['symbol']}</h4>
+            <p style="color: #cbd5e1; margin: 4px 0;"><strong>Max Position:</strong> {max_position_size}% of portfolio</p>
+            <p style="color: #cbd5e1; margin: 4px 0;"><strong>Suggested Size:</strong> {max(1, max_position_size // 2)}% (Conservative)</p>
+            <p style="color: #cbd5e1; margin: 4px 0;"><strong>High Vol Adjustment:</strong> {'Reduce by 50%' if current_data['symbol'] in ['TSLA', 'NVDA'] else 'Standard sizing'}</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div style="background: rgba(45, 55, 72, 0.8); padding: 20px; border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.3);">
+            <h4 style="color: #ef4444; margin-bottom: 12px;">🛡️ Risk Limits</h4>
+            <p style="color: #cbd5e1; margin: 4px 0;"><strong>Stop Loss:</strong> {stop_loss}%</p>
+            <p style="color: #cbd5e1; margin: 4px 0;"><strong>Profit Target:</strong> {profit_target}%</p>
+            <p style="color: #cbd5e1; margin: 4px 0;"><strong>Max DTE:</strong> {'5 days' if current_data['symbol'] in data_manager.symbols[:4] else '3 days'}</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # Auto-refresh logic
 if auto_refresh:
@@ -941,8 +1345,19 @@ if auto_refresh:
         st.session_state.last_update = datetime.now()
         st.rerun()
 
-# Get current symbol data
-current_data = data_manager.data[selected_symbol]
+# Get current symbol data with error handling
+try:
+    if 'selected_symbol' in locals() and selected_symbol in data_manager.data:
+        current_data = data_manager.data[selected_symbol]
+    else:
+        # Fallback to SPY if symbol not found
+        current_data = data_manager.data['SPY']
+        selected_symbol = 'SPY'
+except KeyError:
+    # Generate data if missing
+    data_manager.refresh_data()
+    current_data = data_manager.data['SPY']
+    selected_symbol = 'SPY'
 
 # Check for alerts
 current_alerts = alert_system.check_alerts(current_data)
@@ -968,7 +1383,38 @@ if current_alerts:
 tab1, tab2, tab3, tab4 = st.tabs(["🧠 **GEX Analysis**", "🎯 **Trade Setups**", "📊 **Portfolio**", "📚 **Education**"])
 
 with tab1:
-    st.markdown("### 📊 **Key Metrics**")
+    # Add symbol analysis header
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown(f"### 📊 **{current_data['symbol']} - Key Metrics**")
+    with col2:
+        if st.button("🔄 **Refresh Analysis**", key="refresh_symbol"):
+            with st.spinner(f"Refreshing {current_data['symbol']} data..."):
+                # Refresh data for current symbol
+                data_manager.data[current_data['symbol']] = data_manager._generate_symbol_data(current_data['symbol'])
+                time.sleep(1)
+            st.success("✅ Analysis updated!")
+            st.rerun()
+    
+    # Display symbol information
+    symbol_info = current_data['symbol_info']
+    st.markdown(f"""
+    <div style="background: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 16px; margin: 16px 0; border: 2px solid rgba(96, 165, 250, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h3 style="color: #60a5fa; margin: 0;">{current_data['symbol']} - {symbol_info.get('name', 'Unknown Company')}</h3>
+                <p style="color: #cbd5e1; margin: 4px 0 0 0;">
+                    <strong>Sector:</strong> {symbol_info.get('sector', 'Unknown')} | 
+                    <strong>Market Cap:</strong> {symbol_info.get('market_cap', 'N/A')}
+                </p>
+            </div>
+            <div style="text-align: right;">
+                <div style="color: #ffffff; font-size: 2rem; font-weight: bold;">${current_data['price']}</div>
+                <div style="color: #94a3b8; font-size: 0.9em;">Last Price</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Key metrics in enhanced cards
     col1, col2, col3, col4 = st.columns(4)
@@ -1022,9 +1468,20 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
     
-    # Enhanced GEX Chart
+    # Enhanced GEX Chart with symbol title
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     gex_chart = create_enhanced_gex_chart(current_data)
+    
+    # Update chart title to include symbol info
+    gex_chart.update_layout(
+        title={
+            'text': f"{current_data['symbol']} - {symbol_info.get('name', 'Unknown')} | Gamma Exposure Analysis",
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': {'size': 20, 'color': '#ffffff'}
+        }
+    )
+    
     st.plotly_chart(gex_chart, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -1066,7 +1523,39 @@ with tab1:
         """, unsafe_allow_html=True)
 
 with tab2:
-    st.markdown("### 🎯 **Morning Trade Setups**")
+    st.markdown(f"### 🎯 **{current_data['symbol']} Morning Trade Setups**")
+    
+    # Add quick symbol stats
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        regime_color = "#ef4444" if current_data['net_gex'] < 0 else "#10b981"
+        st.markdown(f"""
+        <div style="text-align: center; padding: 16px; background: rgba(45, 55, 72, 0.8); border-radius: 12px; border: 2px solid {regime_color}40;">
+            <div style="color: {regime_color}; font-size: 1.2rem; font-weight: bold;">{current_data['regime']}</div>
+            <div style="color: #cbd5e1; font-size: 0.9rem;">Net GEX: {current_data['net_gex']}B</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        flip_distance = abs(current_data['price'] - current_data['gamma_flip']) / current_data['price'] * 100
+        flip_color = "#f59e0b" if flip_distance < 1 else "#60a5fa"
+        st.markdown(f"""
+        <div style="text-align: center; padding: 16px; background: rgba(45, 55, 72, 0.8); border-radius: 12px; border: 2px solid {flip_color}40;">
+            <div style="color: {flip_color}; font-size: 1.2rem; font-weight: bold;">${current_data['gamma_flip']}</div>
+            <div style="color: #cbd5e1; font-size: 0.9rem;">Gamma Flip ({flip_distance:.1f}% away)</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        conf_color = "#10b981" if current_data['confidence'] > 70 else "#f59e0b" if current_data['confidence'] > 50 else "#ef4444"
+        st.markdown(f"""
+        <div style="text-align: center; padding: 16px; background: rgba(45, 55, 72, 0.8); border-radius: 12px; border: 2px solid {conf_color}40;">
+            <div style="color: {conf_color}; font-size: 1.2rem; font-weight: bold;">{current_data['confidence']:.0f}%</div>
+            <div style="color: #cbd5e1; font-size: 0.9rem;">Setup Confidence</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
     
     if current_data['setups']:
         for i, setup in enumerate(current_data['setups']):
@@ -1141,7 +1630,43 @@ with tab2:
                     st.success(f"📊 Backtest Results: {win_rate:.1f}% win rate, {avg_return:.1f}% avg return")
     
     else:
-        st.info("🔍 No high-confidence setups detected for current market conditions")
+        st.markdown(f"""
+        <div style="text-align: center; padding: 40px; background: rgba(45, 55, 72, 0.8); border-radius: 16px; border: 2px solid rgba(245, 158, 11, 0.4);">
+            <h3 style="color: #f59e0b; margin-bottom: 16px;">🔍 No High-Confidence Setups</h3>
+            <p style="color: #cbd5e1; margin-bottom: 16px;">No high-probability setups detected for <strong>{current_data['symbol']}</strong> under current market conditions.</p>
+            <div style="background: rgba(245, 158, 11, 0.1); padding: 16px; border-radius: 12px; margin: 16px 0;">
+                <p style="color: #fbbf24; margin: 0;"><strong>💡 Suggestions:</strong></p>
+                <ul style="color: #cbd5e1; text-align: left; margin: 8px 0;">
+                    <li>Wait for price to approach gamma flip point</li>
+                    <li>Monitor for wall breach setups</li>
+                    <li>Consider alternative symbols with stronger signals</li>
+                    <li>Check back after market open for updated conditions</li>
+                </ul>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show current levels for reference
+        st.markdown("#### 📊 **Current Key Levels**")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**📈 Call Walls (Resistance)**")
+            if current_data['call_walls']:
+                for wall in current_data['call_walls'][:3]:
+                    distance = (wall['strike'] - current_data['price']) / current_data['price'] * 100
+                    st.markdown(f"• **${wall['strike']:.2f}** ({distance:+.1f}%) - {abs(wall['gex']):.1f}M GEX")
+            else:
+                st.markdown("• No significant call walls detected")
+        
+        with col2:
+            st.markdown("**📉 Put Walls (Support)**") 
+            if current_data['put_walls']:
+                for wall in current_data['put_walls'][:3]:
+                    distance = (wall['strike'] - current_data['price']) / current_data['price'] * 100
+                    st.markdown(f"• **${wall['strike']:.2f}** ({distance:+.1f}%) - {abs(wall['gex']):.1f}M GEX")
+            else:
+                st.markdown("• No significant put walls detected")
 
 with tab3:
     st.markdown("### 💼 **Portfolio Overview**")
