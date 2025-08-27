@@ -1,7 +1,6 @@
-# gex_dashboard.py
+# gex_dashboard.py - FIXED VERSION with Correct Table References
 """
-Simple GEX Trading Dashboard
-Tests Databricks connection and displays basic GEX data
+Fixed GEX Trading Dashboard - All table references corrected
 """
 
 import streamlit as st
@@ -20,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS (simplified)
 st.markdown("""
 <style>
     .metric-container {
@@ -29,24 +28,10 @@ st.markdown("""
         border-radius: 0.5rem;
         border-left: 4px solid #1f77b4;
     }
-    .success-box {
-        background-color: #d4edda;
-        color: #155724;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
-    }
-    .warning-box {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Connection function
+# FIXED: Connection function
 @st.cache_resource
 def get_databricks_connection():
     """Get Databricks connection with error handling"""
@@ -61,31 +46,36 @@ def get_databricks_connection():
         st.error(f"❌ Databricks connection failed: {str(e)}")
         return None
 
-# Data fetching functions
+# FIXED: Data fetching functions with CORRECT table name
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def fetch_scan_results():
-    """Fetch latest GEX scan results"""
+    """FIXED: Fetch latest GEX scan results from CORRECT table"""
     connection = get_databricks_connection()
     if not connection:
         return pd.DataFrame()
     
     try:
         cursor = connection.cursor()
+        # CORRECTED QUERY - Uses your actual table
         query = """
         SELECT 
             symbol,
-            current_price,
+            spot_price as current_price,
             gamma_flip_point,
-            net_gex,
-            setup_type,
-            confidence_score,
-            days_to_expiration,
+            distance_to_flip,
             distance_to_flip_pct,
-            scan_timestamp
-        FROM gex_trading.scan_results 
-        WHERE scan_timestamp >= current_timestamp() - interval 4 hours
-        ORDER BY confidence_score DESC
-        LIMIT 20
+            structure_type as setup_type,
+            confidence_score,
+            recommendation,
+            category,
+            priority,
+            analysis_timestamp as scan_timestamp,
+            analysis_date,
+            run_id
+        FROM quant_projects.gex_trading.scheduled_pipeline_results 
+        WHERE analysis_date >= current_date() - interval 3 days
+        ORDER BY confidence_score DESC, analysis_timestamp DESC
+        LIMIT 50
         """
         
         cursor.execute(query)
@@ -94,6 +84,13 @@ def fetch_scan_results():
         
         if results:
             df = pd.DataFrame(results, columns=columns)
+            
+            # Add missing columns for compatibility
+            if 'days_to_expiration' not in df.columns:
+                df['days_to_expiration'] = 3
+            if 'net_gex' not in df.columns:
+                df['net_gex'] = df['recommendation']  # Use recommendation as fallback
+                
             return df
         else:
             return pd.DataFrame()
@@ -107,7 +104,7 @@ def fetch_scan_results():
 
 @st.cache_data(ttl=300)
 def fetch_portfolio_stats():
-    """Fetch basic portfolio statistics"""
+    """FIXED: Fetch basic portfolio statistics from CORRECT table"""
     connection = get_databricks_connection()
     if not connection:
         return {}
@@ -115,7 +112,7 @@ def fetch_portfolio_stats():
     try:
         cursor = connection.cursor()
         
-        # Try to get basic stats from scan results
+        # CORRECTED QUERY - Uses your actual table  
         query = """
         SELECT 
             COUNT(*) as total_symbols,
@@ -123,7 +120,7 @@ def fetch_portfolio_stats():
             AVG(confidence_score) as avg_confidence,
             MAX(analysis_timestamp) as last_scan
         FROM quant_projects.gex_trading.scheduled_pipeline_results 
-        WHERE analysis_date >= current_date() - interval 1 day
+        WHERE analysis_date >= current_date() - interval 2 days
         """
         
         cursor.execute(query)
@@ -160,7 +157,6 @@ def create_gex_scatter_plot(df):
         x='distance_to_flip_pct',
         y='confidence_score',
         color='setup_type',
-        size='days_to_expiration',
         hover_name='symbol',
         hover_data=['current_price', 'gamma_flip_point'],
         title="GEX Setup Quality: Confidence vs Distance to Flip"
@@ -207,7 +203,7 @@ def create_setup_distribution(df):
     
     return fig
 
-# Main dashboard
+# FIXED: Main dashboard function
 def main():
     # Header
     st.title("📊 GEX Trading Dashboard")
@@ -220,16 +216,16 @@ def main():
         # Connection status
         connection = get_databricks_connection()
         if connection:
-            st.markdown('<div class="success-box">✅ Connected to Databricks</div>', unsafe_allow_html=True)
+            st.success("✅ Connected to Databricks")
         else:
-            st.markdown('<div class="warning-box">❌ Databricks connection failed</div>', unsafe_allow_html=True)
+            st.error("❌ Databricks connection failed")
             st.stop()
         
         # Refresh controls
         st.subheader("Data Refresh")
         if st.button("🔄 Refresh Data", type="primary"):
             st.cache_data.clear()
-            st.experimental_rerun()
+            st.rerun()
         
         # Filters
         st.subheader("Filters")
@@ -294,9 +290,9 @@ def main():
             st.plotly_chart(fig_bar, use_container_width=True)
         
         # Data table
-        st.subheader("📋 Current Trading Setups")
+        st.subheader("Current Trading Setups")
         
-        # Display formatted data
+        # Format display data
         display_df = filtered_df.copy()
         if 'current_price' in display_df.columns:
             display_df['current_price'] = display_df['current_price'].apply(lambda x: f"${x:.2f}")
@@ -306,9 +302,8 @@ def main():
             display_df['confidence_score'] = display_df['confidence_score'].apply(lambda x: f"{x:.1f}%")
         if 'distance_to_flip_pct' in display_df.columns:
             display_df['distance_to_flip_pct'] = display_df['distance_to_flip_pct'].apply(lambda x: f"{x:.2f}%")
-        if 'net_gex' in display_df.columns:
-            display_df['net_gex'] = display_df['net_gex'].apply(lambda x: f"{x/1e9:.2f}B" if abs(x) > 1e6 else f"{x/1e6:.1f}M")
         
+        # Show the data table
         st.dataframe(
             display_df[['symbol', 'setup_type', 'confidence_score', 'current_price', 
                        'gamma_flip_point', 'distance_to_flip_pct', 'category', 'priority']],
@@ -328,8 +323,8 @@ def main():
     else:
         st.warning("⚠️ No trading setups found matching your criteria")
         
-        # Show debug info
-        with st.expander("Debug Information"):
+        # Debug section
+        with st.expander("🔍 Debug Information"):
             st.write("Raw scan results shape:", scan_df.shape if not scan_df.empty else "No data")
             if not scan_df.empty:
                 st.write("Sample data:")
@@ -338,7 +333,7 @@ def main():
             
             st.write("Portfolio stats:", portfolio_stats)
             
-            # Test direct query to your table
+            # Test direct query
             st.subheader("Direct Table Query Test")
             try:
                 connection = get_databricks_connection()
@@ -346,21 +341,37 @@ def main():
                     cursor = connection.cursor()
                     test_query = """
                     SELECT COUNT(*) as total_count, 
-                           MAX(analysis_timestamp) as latest_timestamp
+                           MAX(analysis_timestamp) as latest_timestamp,
+                           COUNT(DISTINCT symbol) as unique_symbols
                     FROM quant_projects.gex_trading.scheduled_pipeline_results 
-                    WHERE analysis_date >= current_date() - interval 1 day
+                    WHERE analysis_date >= current_date() - interval 3 days
                     """
                     cursor.execute(test_query)
                     result = cursor.fetchone()
                     if result:
-                        st.write(f"Direct query result: {result[0]} records, latest: {result[1]}")
+                        st.success(f"✅ Direct query successful: {result[0]} records, {result[2]} unique symbols, latest: {result[1]}")
+                        
+                        # Show sample records
+                        sample_query = """
+                        SELECT symbol, structure_type, confidence_score, analysis_timestamp
+                        FROM quant_projects.gex_trading.scheduled_pipeline_results 
+                        ORDER BY analysis_timestamp DESC 
+                        LIMIT 5
+                        """
+                        cursor.execute(sample_query)
+                        sample_results = cursor.fetchall()
+                        if sample_results:
+                            st.write("Sample records:")
+                            sample_df = pd.DataFrame(sample_results, columns=['symbol', 'structure_type', 'confidence_score', 'analysis_timestamp'])
+                            st.dataframe(sample_df)
+                        
                     else:
-                        st.write("Direct query returned no results")
+                        st.error("Direct query returned no results")
                     cursor.close()
                 else:
-                    st.write("No database connection for direct query")
+                    st.error("No database connection for direct query")
             except Exception as e:
-                st.write(f"Direct query failed: {str(e)}")
+                st.error(f"Direct query failed: {str(e)}")
     
     # Footer
     st.markdown("---")
