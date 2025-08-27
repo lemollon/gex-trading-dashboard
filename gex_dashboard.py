@@ -105,16 +105,20 @@ def init_databricks_connection():
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def load_gex_data():
-    """Load GEX data from your ACTUAL pipeline table"""
+    """Load GEX data from your ACTUAL pipeline table - REAL DATA ONLY"""
     connection = init_databricks_connection()
     
     if not connection:
-        return create_sample_data_with_setups()
+        return {
+            'data': pd.DataFrame(),
+            'status': 'disconnected',
+            'message': 'Databricks connection failed - no mock data'
+        }
     
     try:
         cursor = connection.cursor()
         
-        # Query YOUR ACTUAL table with the correct name
+        # Query YOUR ACTUAL table - get ALL records from recent runs
         query = """
         SELECT 
             run_id,
@@ -127,11 +131,12 @@ def load_gex_data():
             recommendation,
             category,
             priority,
-            created_at as analysis_timestamp
+            created_at as analysis_timestamp,
+            analysis_date
         FROM quant_projects.gex_trading.scheduled_pipeline_results
-        WHERE analysis_date >= current_date() - INTERVAL 7 DAYS
-        ORDER BY confidence_score DESC, created_at DESC
-        LIMIT 100
+        WHERE analysis_date >= current_date() - INTERVAL 30 DAYS
+        ORDER BY analysis_date DESC, confidence_score DESC
+        LIMIT 1000
         """
         
         cursor.execute(query)
@@ -142,55 +147,34 @@ def load_gex_data():
         
         cursor.close()
         
+        # Debug information - show what we actually got
+        debug_info = ""
+        if not df.empty:
+            debug_info = f"""
+            **Debug Info:**
+            - Total records: {len(df)}
+            - Date range: {df['analysis_date'].min()} to {df['analysis_date'].max()}
+            - Categories: {df['category'].value_counts().to_dict()}
+            - Confidence range: {df['confidence_score'].min()}-{df['confidence_score'].max()}
+            - Unique runs: {df['run_id'].nunique()}
+            """
+        
         return {
             'data': df,
             'status': 'connected',
-            'message': f'Connected - Loaded {len(df)} records from your pipeline'
+            'message': f'Connected - Loaded {len(df)} real records from your pipeline',
+            'debug_info': debug_info
         }
         
     except Exception as e:
         st.error(f"Query failed: {e}")
         return {
-            'data': create_sample_data_with_setups(),
+            'data': pd.DataFrame(),
             'status': 'error',
-            'message': f'Using sample data due to error: {e}'
+            'message': f'Database query error: {e}'
         }
 
-def create_sample_data_with_setups():
-    """Create sample data that matches your pipeline structure with 24 setups like your real run"""
-    np.random.seed(42)
-    
-    # Use your actual symbols from the successful pipeline run
-    symbols_with_setups = [
-        'SPY', 'VIX', 'AMC', 'GME', 'NIO', 'LCID', 'XPEV', 'LI', 'TSM', 'MRNA',
-        'SNAP', 'INTC', 'BNTX', 'CRWD', 'NOW', 'AMAT', 'USO', 'ADBE', 'KLAC',
-        'IBB', 'INTU', 'XRT', 'COST', 'TGT'
-    ]
-    
-    structure_types = ['squeeze_play', 'negative_gex', 'gamma_flip_play']
-    
-    data = []
-    for i, symbol in enumerate(symbols_with_setups):
-        # Create setups that match your pipeline results
-        confidence = np.random.uniform(70, 95)
-        spot_price = np.random.uniform(50, 500)
-        gamma_flip = spot_price * np.random.uniform(0.995, 1.005)
-        
-        data.append({
-            'run_id': f'run_{i//5}',  # Group them by run like your pipeline
-            'symbol': symbol,
-            'structure_type': np.random.choice(structure_types),
-            'confidence_score': int(confidence),
-            'spot_price': round(spot_price, 2),
-            'gamma_flip_point': round(gamma_flip, 2),
-            'distance_to_flip_pct': round((spot_price - gamma_flip) / spot_price * 100, 2),
-            'recommendation': np.random.choice(['HIGH PRIORITY', 'MODERATE recommendation']),
-            'category': 'ENHANCED_STRATEGY',
-            'priority': 1 if confidence >= 80 else 2,
-            'analysis_timestamp': datetime.now() - timedelta(hours=np.random.randint(0, 48))
-        })
-    
-    return pd.DataFrame(data)
+# Mock data function removed - using REAL DATA ONLY
 
 def format_confidence_class(confidence):
     """Return CSS class based on confidence score"""
@@ -213,14 +197,19 @@ def main():
         df = data_result['data']
         status = data_result['status']
         message = data_result['message']
+        debug_info = data_result.get('debug_info', '')
     else:
         df = data_result
         status = 'unknown'
         message = 'Data loaded'
+        debug_info = ''
     
-    # Status indicator
+    # Status indicator with debug info
     if status == 'connected':
         st.success(f"✅ {message}")
+        if debug_info:
+            with st.expander("🔍 Debug Information", expanded=False):
+                st.markdown(debug_info)
     elif status == 'error':
         st.warning(f"⚠️ {message}")
     else:
@@ -236,11 +225,20 @@ def main():
         
         st.markdown("---")
         
-        # Filters
+        # Filters with real-time feedback
         min_confidence = st.slider("Minimum Confidence %", 0, 100, 70)
         
+        # Show live filtering results
         if not df.empty:
-            available_types = df['structure_type'].unique().tolist()
+            total_before_filter = len(df)
+            after_confidence_filter = len(df[df['confidence_score'] >= min_confidence])
+            st.caption(f"📊 {after_confidence_filter} of {total_before_filter} setups meet confidence threshold")
+        
+        if not df.empty:
+            # Apply confidence filter first for other filters
+            confidence_filtered_df = df[df['confidence_score'] >= min_confidence]
+            
+            available_types = confidence_filtered_df['structure_type'].unique().tolist() if not confidence_filtered_df.empty else []
             setup_types = st.multiselect(
                 "Setup Types",
                 available_types,
@@ -249,8 +247,8 @@ def main():
             
             symbols = st.multiselect(
                 "Symbols",
-                sorted(df['symbol'].unique().tolist()),
-                default=sorted(df['symbol'].unique().tolist())[:10]
+                sorted(confidence_filtered_df['symbol'].unique().tolist()) if not confidence_filtered_df.empty else [],
+                default=sorted(confidence_filtered_df['symbol'].unique().tolist())[:10] if not confidence_filtered_df.empty else []
             )
         else:
             setup_types = []
@@ -285,15 +283,25 @@ def main():
     
     # Main dashboard
     if df.empty:
-        st.error("No data available. Check Databricks connection or run your pipeline.")
-        return
+        st.error("❌ No real data available from your pipeline")
+        st.info("🔧 **Next Steps:**")
+        st.markdown("""
+        1. **Check Databricks Connection** - Verify secrets are configured
+        2. **Run Your Pipeline** - Execute your GEX pipeline in Databricks to generate data  
+        3. **Verify Table** - Confirm data exists in `quant_projects.gex_trading.scheduled_pipeline_results`
+        4. **Check Date Range** - Pipeline looks for data from last 7 days
+        """)
+        st.stop()
     
-    # Apply filters
+    # Apply all filters
     filtered_df = df[
         (df['confidence_score'] >= min_confidence) &
         (df['structure_type'].isin(setup_types)) &
         (df['symbol'].isin(symbols))
     ].copy()
+    
+    # Show filtering results
+    st.sidebar.success(f"✅ Showing {len(filtered_df)} filtered setups")
     
     if filtered_df.empty:
         st.warning("No data matches your filters. Try adjusting the criteria.")
