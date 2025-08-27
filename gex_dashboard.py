@@ -311,7 +311,7 @@ def main():
         
         st.dataframe(
             display_df[['symbol', 'setup_type', 'confidence_score', 'current_price', 
-                       'gamma_flip_point', 'distance_to_flip_pct', 'category']],
+                       'gamma_flip_point', 'distance_to_flip_pct', 'category', 'priority']],
             use_container_width=True
         )
         
