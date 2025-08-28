@@ -1,20 +1,96 @@
+"""
+GEX Master Pro - Combined Dashboard
+Combines single symbol analysis with pipeline database connections
+"""
+
 import streamlit as st
 import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from datetime import datetime, timedelta
+import time
 import requests
 import json
-import yfinance as yf
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import random
-import numpy as np
-from typing import Dict, List, Optional
+
+# Try to import Databricks connector
+try:
+    from databricks import sql
+    DATABRICKS_AVAILABLE = True
+except ImportError:
+    DATABRICKS_AVAILABLE = False
+    st.error("databricks-sql-connector not installed. Run: pip install databricks-sql-connector")
+
+# Try to import yfinance for price data
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    st.error("yfinance not installed. Run: pip install yfinance")
 
 # Page config
 st.set_page_config(
-    page_title="GEX Trading Dashboard",
-    page_icon="🎯",
-    layout="wide"
+    page_title="GEX Master Pro",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Simple CSS styling - keeping it basic for device compatibility
+st.markdown("""
+<style>
+    .main {
+        padding-top: 1rem;
+    }
+    
+    .stAlert > div {
+        padding: 1rem;
+        border-radius: 10px;
+    }
+    
+    .metric-container {
+        background: #f0f2f6;
+        color: #0e1117;
+        padding: 1.5rem;
+        border-radius: 10px;
+        text-align: center;
+        margin: 0.5rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .setup-card {
+        background: white;
+        border: 1px solid #e0e0e0;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .high-confidence {
+        border-left: 5px solid #28a745;
+    }
+    
+    .medium-confidence {
+        border-left: 5px solid #ffc107;
+    }
+    
+    .low-confidence {
+        border-left: 5px solid #dc3545;
+    }
+    
+    .status-connected {
+        color: #28a745;
+        font-weight: bold;
+    }
+    
+    .status-disconnected {
+        color: #dc3545;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # API Configuration - Using secrets
 @st.cache_data
@@ -33,9 +109,104 @@ def get_api_config():
 
 api_config = get_api_config()
 
-# GEX Analysis Functions (Extracted from Cell 9)
-def fetch_real_gex_data(symbol: str) -> Dict:
-    """Fetch real GEX data from API with fallback"""
+@st.cache_resource
+def init_databricks_connection():
+    """Initialize Databricks connection"""
+    try:
+        if not DATABRICKS_AVAILABLE:
+            return None
+            
+        if "databricks" not in st.secrets:
+            st.error("Databricks secrets not configured")
+            return None
+            
+        connection = sql.connect(
+            server_hostname=st.secrets["databricks"]["server_hostname"],
+            http_path=st.secrets["databricks"]["http_path"],
+            access_token=st.secrets["databricks"]["access_token"]
+        )
+        return connection
+    except Exception as e:
+        st.error(f"Databricks connection failed: {e}")
+        return None
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def load_gex_data():
+    """Load GEX data from pipeline table"""
+    connection = init_databricks_connection()
+    
+    if not connection:
+        return {
+            'data': pd.DataFrame(),
+            'status': 'disconnected',
+            'message': 'Databricks connection failed'
+        }
+    
+    try:
+        cursor = connection.cursor()
+        
+        # Query pipeline table
+        query = """
+        SELECT 
+            run_id,
+            symbol,
+            structure_type,
+            confidence_score,
+            spot_price,
+            gamma_flip_point,
+            distance_to_flip_pct,
+            recommendation,
+            category,
+            priority,
+            created_at as analysis_timestamp,
+            analysis_date
+        FROM quant_projects.gex_trading.scheduled_pipeline_results
+        WHERE analysis_date >= current_date() - INTERVAL 30 DAYS
+        ORDER BY analysis_date DESC, confidence_score DESC
+        LIMIT 1000
+        """
+        
+        cursor.execute(query)
+        results = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        
+        df = pd.DataFrame(results, columns=columns)
+        
+        cursor.close()
+        
+        # Debug information
+        debug_info = ""
+        if not df.empty:
+            debug_info = f"""
+            **Debug Info:**
+            - Total records: {len(df)}
+            - Date range: {df['analysis_date'].min()} to {df['analysis_date'].max()}
+            - Categories: {df['category'].value_counts().to_dict()}
+            - Confidence range: {df['confidence_score'].min()}-{df['confidence_score'].max()}
+            - Unique runs: {df['run_id'].nunique()}
+            """
+        
+        return {
+            'data': df,
+            'status': 'connected',
+            'message': f'Connected - Loaded {len(df)} records from pipeline',
+            'debug_info': debug_info
+        }
+        
+    except Exception as e:
+        st.error(f"Query failed: {e}")
+        return {
+            'data': pd.DataFrame(),
+            'status': 'error',
+            'message': f'Database query error: {e}'
+        }
+
+# Single Symbol Analysis Functions
+def fetch_real_gex_data(symbol: str) -> dict:
+    """Fetch real GEX data from API with databricks fallback"""
+    api_failures = []
+    
+    # First, try API endpoints
     try:
         endpoints = [
             f"{api_config['base_url']}/gex/latest",
@@ -44,6 +215,8 @@ def fetch_real_gex_data(symbol: str) -> Dict:
         
         for endpoint in endpoints:
             try:
+                st.info(f"Attempting to fetch data from {endpoint}...")
+                
                 response = requests.get(
                     endpoint,
                     params={
@@ -60,22 +233,101 @@ def fetch_real_gex_data(symbol: str) -> Dict:
                         if symbol in data:
                             result = parse_gex_response(symbol, data[symbol])
                             if result and result.get('success'):
+                                st.success(f"Successfully fetched data from {endpoint}")
                                 return result
                     elif 'Gex Flip' in response.text:
                         result = parse_csv_data(symbol, response.text)
                         if result and result.get('success'):
+                            st.success(f"Successfully fetched data from {endpoint}")
                             return result
                 
-            except Exception:
+                # Record the failure reason
+                api_failures.append({
+                    'endpoint': endpoint,
+                    'status_code': response.status_code,
+                    'response_text': response.text[:100] + '...' if len(response.text) > 100 else response.text
+                })
+                
+            except Exception as e:
+                api_failures.append({
+                    'endpoint': endpoint,
+                    'exception': str(e)
+                })
                 continue
         
-        # Fallback: Generate synthetic data
-        return generate_realistic_synthetic_data(symbol)
-        
+        # Next, try to fetch from Databricks if API failed
+        connection = init_databricks_connection()
+        if connection:
+            try:
+                cursor = connection.cursor()
+                
+                query = f"""
+                SELECT 
+                    symbol,
+                    spot_price,
+                    gamma_flip_point,
+                    net_gex,
+                    call_wall,
+                    put_wall,
+                    distance_to_flip_pct
+                FROM quant_projects.gex_trading.scheduled_pipeline_results
+                WHERE symbol = '{symbol}'
+                ORDER BY analysis_date DESC, analysis_timestamp DESC
+                LIMIT 1
+                """
+                
+                cursor.execute(query)
+                result = cursor.fetchone()
+                
+                if result:
+                    columns = [desc[0] for desc in cursor.description]
+                    data = dict(zip(columns, result))
+                    
+                    # Convert to expected format
+                    db_result = {
+                        'success': True,
+                        'symbol': data['symbol'],
+                        'spot_price': data['spot_price'],
+                        'gamma_flip_point': data['gamma_flip_point'],
+                        'net_gex': data['net_gex'],
+                        'call_wall': data['call_wall'],
+                        'put_wall': data['put_wall'],
+                        'distance_to_flip': data['distance_to_flip_pct'],
+                        'database_source': True
+                    }
+                    
+                    # Generate gamma structure
+                    gex_structure = generate_gex_structure(
+                        data['spot_price'], 
+                        data['gamma_flip_point'], 
+                        data['net_gex']
+                    )
+                    
+                    db_result['gex_structure'] = gex_structure
+                    st.success(f"Successfully fetched {symbol} data from database")
+                    return db_result
+                
+                cursor.close()
+            except Exception as e:
+                st.warning(f"Database query failed: {e}")
+                
     except Exception as e:
-        return {'success': False, 'error': f'Fetch error: {str(e)}'}
+        st.error(f"Critical error in fetch process: {str(e)}")
+    
+    # Log the API failures for debugging
+    st.warning("⚠️ All data source attempts failed.")
+    with st.expander("Failure Details"):
+        for failure in api_failures:
+            st.write(f"Endpoint: {failure['endpoint']}")
+            if 'status_code' in failure:
+                st.write(f"Status Code: {failure['status_code']}")
+                st.write(f"Response: {failure['response_text']}")
+            else:
+                st.write(f"Exception: {failure['exception']}")
+    
+    return {'success': False, 'error': f'Failed to fetch data for {symbol}'}
 
-def parse_gex_response(symbol: str, data: Dict) -> Dict:
+def parse_gex_response(symbol: str, data: dict) -> dict:
     """Parse GEX API response"""
     try:
         current_price = float(data.get('price', 0))
@@ -106,7 +358,7 @@ def parse_gex_response(symbol: str, data: Dict) -> Dict:
     except Exception as e:
         return {'success': False, 'error': f'Parse error: {str(e)}'}
 
-def parse_csv_data(symbol: str, csv_text: str) -> Dict:
+def parse_csv_data(symbol: str, csv_text: str) -> dict:
     """Parse CSV GEX levels data"""
     try:
         lines = csv_text.strip().split(',')
@@ -140,8 +392,8 @@ def parse_csv_data(symbol: str, csv_text: str) -> Dict:
     
     return {'success': False, 'error': 'CSV parse failed'}
 
-def generate_gex_structure(current_price: float, gamma_flip: float, net_gex: float) -> Dict:
-    """Generate realistic GEX structure across strikes"""
+def generate_gex_structure(current_price: float, gamma_flip: float, net_gex: float) -> dict:
+    """Generate GEX structure across strikes based on key levels"""
     # Price range to show in structure (±10% from current price)
     min_price = current_price * 0.9
     max_price = current_price * 1.1
@@ -190,12 +442,9 @@ def generate_gex_structure(current_price: float, gamma_flip: float, net_gex: flo
         # Scale to realistic values (in millions)
         max_gex = abs(net_gex) / 1e6 / num_strikes * 2
         
-        # Add randomness for realism
-        random_factor = random.uniform(0.7, 1.3)
-        
         # Call gamma is positive, put gamma is negative
-        strike_call_gamma = call_contribution * max_gex * random_factor
-        strike_put_gamma = -put_contribution * max_gex * random_factor
+        strike_call_gamma = call_contribution * max_gex 
+        strike_put_gamma = -put_contribution * max_gex 
         
         # Total GEX at this strike
         strike_gex = strike_call_gamma + strike_put_gamma
@@ -211,9 +460,9 @@ def generate_gex_structure(current_price: float, gamma_flip: float, net_gex: flo
             strike_put_gamma *= 3.0
             strike_gex = strike_call_gamma + strike_put_gamma
         
-        # Generate realistic OI values
-        strike_call_oi = int(strike_call_gamma * 1e4 * random.uniform(0.8, 1.2))
-        strike_put_oi = int(abs(strike_put_gamma) * 1e4 * random.uniform(0.8, 1.2))
+        # Generate OI values
+        strike_call_oi = int(strike_call_gamma * 1e4)
+        strike_put_oi = int(abs(strike_put_gamma) * 1e4)
         
         gex_values.append(strike_gex)
         call_gamma.append(strike_call_gamma)
@@ -231,51 +480,7 @@ def generate_gex_structure(current_price: float, gamma_flip: float, net_gex: flo
         'put_oi': put_oi
     }
 
-def generate_realistic_synthetic_data(symbol: str) -> Dict:
-    """Generate realistic synthetic GEX data when API fails"""
-    try:
-        # Get current price from yfinance
-        ticker_data = yf.download(symbol, period='5d', progress=False)
-        if ticker_data.empty:
-            return {'success': False, 'error': 'No price data available'}
-        
-        current_price = float(ticker_data['Close'].iloc[-1])
-        
-        # Generate realistic GEX values
-        random.seed(hash(symbol + str(datetime.now().date())))
-        
-        flip_offset = random.uniform(-0.02, 0.02)
-        gamma_flip = current_price * (1 + flip_offset)
-        
-        gex_scenarios = [
-            (-1.2e9, -0.5e9),  # Negative GEX range
-            (0.5e9, 3.0e9),    # Positive GEX range
-            (-0.2e9, 0.2e9)    # Near zero
-        ]
-        
-        gex_range = random.choice(gex_scenarios)
-        net_gex = random.uniform(gex_range[0], gex_range[1])
-        
-        # Generate GEX structure data points
-        gex_structure = generate_gex_structure(current_price, gamma_flip, net_gex)
-        
-        return {
-            'success': True,
-            'symbol': symbol,
-            'spot_price': current_price,
-            'net_gex': net_gex,
-            'gamma_flip_point': gamma_flip,
-            'call_wall': current_price * 1.02,
-            'put_wall': current_price * 0.98,
-            'distance_to_flip': (current_price - gamma_flip) / current_price * 100,
-            'synthetic': True,
-            'gex_structure': gex_structure
-        }
-        
-    except Exception as e:
-        return {'success': False, 'error': f'Synthetic data generation failed: {str(e)}'}
-
-def detect_enhanced_strategies(symbol: str, gex_data: Dict) -> List[Dict]:
+def detect_enhanced_strategies(symbol: str, gex_data: dict) -> list:
     """Detect trading strategies based on GEX data"""
     setups = []
     spot_price = gex_data['spot_price']
@@ -344,7 +549,7 @@ def detect_enhanced_strategies(symbol: str, gex_data: Dict) -> List[Dict]:
     
     return setups
 
-def enhance_setup_for_big_moves(setup: Dict, gex_data: Dict) -> Dict:
+def enhance_setup_for_big_moves(setup: dict, gex_data: dict) -> dict:
     """Enhance setup with big move potential"""
     confidence = setup.get('confidence', 0)
     net_gex_billions = abs(setup.get('net_gex', gex_data['net_gex'] / 1e9))
@@ -395,7 +600,7 @@ def enhance_setup_for_big_moves(setup: Dict, gex_data: Dict) -> Dict:
     
     return enhanced
 
-def plot_gex_structure(symbol: str, gex_data: Dict) -> go.Figure:
+def plot_gex_structure(symbol: str, gex_data: dict) -> go.Figure:
     """Create detailed GEX structure visualization"""
     # Get GEX structure data
     gex_structure = gex_data.get('gex_structure', {})
@@ -403,10 +608,8 @@ def plot_gex_structure(symbol: str, gex_data: Dict) -> go.Figure:
     gex_values = gex_structure.get('gex_values', [])
     call_gamma = gex_structure.get('call_gamma', [])
     put_gamma = gex_structure.get('put_gamma', [])
-    call_oi = gex_structure.get('call_oi', [])
-    put_oi = gex_structure.get('put_oi', [])
     
-    # Create subplot figure with 2 rows
+    # Create subplot figure
     fig = go.Figure()
     
     # GEX values bar chart (stacked)
@@ -415,7 +618,7 @@ def plot_gex_structure(symbol: str, gex_data: Dict) -> go.Figure:
             x=strikes,
             y=call_gamma,
             name='Call Gamma',
-            marker_color='lightgreen',
+            marker_color='#28a745',
             opacity=0.7
         )
     )
@@ -425,7 +628,7 @@ def plot_gex_structure(symbol: str, gex_data: Dict) -> go.Figure:
             x=strikes,
             y=put_gamma,
             name='Put Gamma',
-            marker_color='lightcoral',
+            marker_color='#dc3545',
             opacity=0.7
         )
     )
@@ -437,26 +640,26 @@ def plot_gex_structure(symbol: str, gex_data: Dict) -> go.Figure:
             y=gex_values,
             mode='lines',
             name='Net GEX',
-            line=dict(color='blue', width=2)
+            line=dict(color='#007bff', width=2)
         )
     )
     
     # Add zero line
     fig.add_shape(
         type="line",
-        x0=min(strikes),
+        x0=min(strikes) if strikes else gex_data['spot_price'] * 0.9,
         y0=0,
-        x1=max(strikes),
+        x1=max(strikes) if strikes else gex_data['spot_price'] * 1.1,
         y1=0,
         line=dict(color="gray", dash="dash"),
     )
     
     # Add price levels
     levels = [
-        (gex_data['call_wall'], "Call Wall", "red"),
-        (gex_data['spot_price'], "Current Price", "blue"),
-        (gex_data['gamma_flip_point'], "Gamma Flip", "orange"),
-        (gex_data['put_wall'], "Put Wall", "green")
+        (gex_data['call_wall'], "Call Wall", "#dc3545"),
+        (gex_data['spot_price'], "Current Price", "#007bff"),
+        (gex_data['gamma_flip_point'], "Gamma Flip", "#fd7e14"),
+        (gex_data['put_wall'], "Put Wall", "#28a745")
     ]
     
     for price, label, color in levels:
@@ -481,98 +684,106 @@ def plot_gex_structure(symbol: str, gex_data: Dict) -> go.Figure:
             y=1.02,
             xanchor="right",
             x=1
-        )
+        ),
+        template="plotly_white"
     )
     
     return fig
 
-@st.cache_data
-def load_pipeline_data():
-    """Load data from the pipeline table"""
-    # This would connect to your Databricks table
-    # For now, return sample data structure
-    return pd.DataFrame({
-        'symbol': ['SPY', 'QQQ', 'AAPL'],
-        'confidence_score': [85, 72, 68],
-        'structure_type': ['squeeze_play', 'breakdown_play', 'premium_selling'],
-        'category': ['ENHANCED_STRATEGY', 'BIG_MOVE_ENHANCED', 'GEX_CONDITION'],
-        'created_at': [datetime.now() - timedelta(minutes=x) for x in [5, 10, 15]]
-    })
+def format_confidence_class(confidence):
+    """Return CSS class based on confidence score"""
+    if confidence >= 80:
+        return "high-confidence"
+    elif confidence >= 60:
+        return "medium-confidence"
+    else:
+        return "low-confidence"
 
-# Apply custom styling
-def apply_custom_styling():
-    st.markdown("""
-    <style>
-    /* Main background with gradient */
-    .stApp {
-        background-color: #0e1117;
-        background-image: linear-gradient(19deg, #21213a 0%, #0e1117 100%);
-    }
-    
-    /* Metrics styling with glassmorphism */
-    div[data-testid="metric-container"] {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        backdrop-filter: blur(5px);
-        padding: 10px !important;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-        transition: all 0.3s ease;
-    }
-    
-    div[data-testid="metric-container"]:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.5);
-        background: rgba(255, 255, 255, 0.08);
-    }
-    
-    /* Headers styling */
-    h1, h2, h3 {
-        color: #ffffff;
-        font-weight: 700;
-    }
-    
-    /* Accent color for buttons */
-    .stButton>button {
-        background: linear-gradient(45deg, #4b6cb7, #182848);
-        color: white;
-        border: none;
-        border-radius: 5px;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton>button:hover {
-        background: linear-gradient(45deg, #182848, #4b6cb7);
-        transform: scale(1.05);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# Dashboard Layout
 def main():
-    # Apply styling
-    apply_custom_styling()
-    
-    st.title("🎯 GEX Trading Dashboard")
-    st.markdown("Real-time Gamma Exposure Analysis for Optimal Options Trading")
-    
-    # Initialize session state for storing data between reruns
+    # Initialize session state
     if 'gex_data' not in st.session_state:
         st.session_state.gex_data = {}
-    if 'trade_setups' not in st.session_state:
-        st.session_state.trade_setups = []
     if 'last_update' not in st.session_state:
         st.session_state.last_update = None
+    if 'api_status' not in st.session_state:
+        st.session_state.api_status = {
+            'last_checked': None,
+            'status': 'unknown',
+            'failures': 0,
+            'successes': 0
+        }
     
-    # Sidebar for navigation and settings
+    # Header
+    st.title("⚡ GEX Master Pro")
+    
+    # Sidebar for navigation
     st.sidebar.title("Navigation")
-    page = st.sidebar.selectbox("Select Page", ["Single Symbol Analysis", "Pipeline Results", "Market Overview"])
+    page = st.sidebar.selectbox("Select Page", [
+        "Single Symbol Analysis", 
+        "Pipeline Dashboard", 
+        "Market Overview"
+    ])
     
-    # Auto-refresh option
-    auto_refresh = st.sidebar.checkbox("Auto-refresh (5 min)", value=False)
+    # Sidebar API status
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("API Status")
     
+    if st.session_state.api_status['status'] == 'online':
+        st.sidebar.success("✅ TradingVolatility API: Online")
+    elif st.session_state.api_status['status'] == 'offline':
+        st.sidebar.error("❌ TradingVolatility API: Offline")
+    else:
+        st.sidebar.info("ℹ️ API Status: Unknown")
+    
+    if st.session_state.api_status['last_checked']:
+        st.sidebar.caption(f"Last checked: {st.session_state.api_status['last_checked'].strftime('%H:%M:%S')}")
+    
+    # API test button
+    if st.sidebar.button("Test API Connection"):
+        with st.sidebar:
+            with st.spinner("Testing API connection..."):
+                try:
+                    test_symbol = "SPY"
+                    response = requests.get(
+                        f"{api_config['base_url']}/gex/latest",
+                        params={
+                            'ticker': test_symbol,
+                            'username': api_config['username'],
+                            'format': 'json'
+                        },
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        st.session_state.api_status['status'] = 'online'
+                        st.session_state.api_status['last_checked'] = datetime.now()
+                        st.session_state.api_status['successes'] += 1
+                        st.success("✅ API connection successful!")
+                    else:
+                        st.session_state.api_status['status'] = 'offline'
+                        st.session_state.api_status['last_checked'] = datetime.now()
+                        st.session_state.api_status['failures'] += 1
+                        st.error(f"❌ API returned status code: {response.status_code}")
+                        
+                except Exception as e:
+                    st.session_state.api_status['status'] = 'offline'
+                    st.session_state.api_status['last_checked'] = datetime.now()
+                    st.session_state.api_status['failures'] += 1
+                    st.error(f"❌ API connection failed: {str(e)}")
+    
+    # Databricks status
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Databricks Status")
+    
+    db_connection = init_databricks_connection()
+    if db_connection:
+        st.sidebar.success("✅ Databricks: Connected")
+    else:
+        st.sidebar.error("❌ Databricks: Disconnected")
+    
+    # Page-specific content
     if page == "Single Symbol Analysis":
-        st.header("Single Symbol GEX Analysis")
+        st.subheader("Single Symbol GEX Analysis")
         
         # Input section
         col1, col2 = st.columns([2, 1])
@@ -587,10 +798,19 @@ def main():
             with st.spinner(f"Analyzing {symbol}..."):
                 gex_data = fetch_real_gex_data(symbol)
                 
+                # Update API status based on result
                 if gex_data.get('success'):
                     # Store in session state
                     st.session_state.gex_data[symbol] = gex_data
                     st.session_state.last_update = datetime.now()
+                    
+                    # Determine data source for user information
+                    if gex_data.get('database_source'):
+                        data_source = "Database"
+                        st.info("📊 Using data from your Databricks pipeline")
+                    else:
+                        data_source = "API"
+                        st.success("📡 Using real-time API data")
                     
                     # GEX Structure Display
                     st.subheader(f"GEX Structure for {symbol}")
@@ -666,7 +886,7 @@ def main():
                             enhanced_setup = enhance_setup_for_big_moves(setup, gex_data)
                             
                             if enhanced_setup.get('big_move_mode'):
-                                st.success(f"🚀 BIG MOVE SETUP DETECTED")
+                                st.success(f"BIG MOVE SETUP DETECTED")
                                 
                                 col1, col2 = st.columns(2)
                                 with col1:
@@ -692,10 +912,6 @@ def main():
                                     st.write(f"**Target:** ${setup['target']:.2f}")
                                     st.write(f"**Expected Move:** {setup['expected_move']}")
                                     st.write(f"**Reason:** {setup['reason']}")
-                            
-                            # Store setup in session state
-                            if setup not in st.session_state.trade_setups:
-                                st.session_state.trade_setups.append(setup)
                     else:
                         st.info("No specific trading setups detected for current GEX conditions.")
                     
@@ -723,105 +939,494 @@ def main():
                     st.markdown(f":{regime_color}[**{regime}**]")
                     st.write(regime_description)
                     
-                    # Data source indicator
-                    if gex_data.get('synthetic'):
-                        st.warning("⚠️ Using synthetic data (API unavailable)")
-                    else:
-                        st.success("✅ Real-time GEX data")
-                    
                 else:
                     st.error(f"Failed to fetch data for {symbol}: {gex_data.get('error', 'Unknown error')}")
     
-    elif page == "Pipeline Results":
-        st.header("Pipeline Results")
+    elif page == "Pipeline Dashboard":
+        st.subheader("Pipeline Dashboard")
         
-        # Load pipeline data (this would connect to your Databricks table)
-        df = load_pipeline_data()
+        # Load data
+        data_result = load_gex_data()
+        
+        if isinstance(data_result, dict):
+            df = data_result['data']
+            status = data_result['status']
+            message = data_result['message']
+            debug_info = data_result.get('debug_info', '')
+        else:
+            df = data_result
+            status = 'unknown'
+            message = 'Data loaded'
+            debug_info = ''
+        
+        # Status indicator with debug info
+        if status == 'connected':
+            st.success(f"✅ {message}")
+            if debug_info:
+                with st.expander("Debug Information", expanded=False):
+                    st.markdown(debug_info)
+        elif status == 'error':
+            st.warning(f"⚠️ {message}")
+        else:
+            st.info(f"ℹ️ {message}")
+        
+        # Refresh button
+        if st.button("Refresh Data", type="primary"):
+            st.cache_data.clear()
+            st.rerun()
+        
+        if df.empty:
+            st.error("No pipeline data available")
+            st.info("""
+            **Possible Reasons:**
+            1. No recent pipeline runs
+            2. Database connection issue
+            3. Pipeline table is empty
+            
+            Please check your Databricks environment and ensure your pipeline has been executed.
+            """)
+            return
         
         # Filters
+        st.subheader("Filters")
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            confidence_filter = st.selectbox("Confidence Level", ["All", "High (80%+)", "Medium (70-79%)", "Low (<70%)"])
+            min_confidence = st.slider("Minimum Confidence %", 0, 100, 70)
         
         with col2:
-            category_filter = st.selectbox("Category", ["All", "ENHANCED_STRATEGY", "BIG_MOVE_ENHANCED", "GEX_CONDITION"])
+            if not df.empty:
+                setup_types = st.multiselect(
+                    "Setup Types",
+                    df['structure_type'].unique().tolist(),
+                    default=df['structure_type'].unique().tolist()
+                )
+            else:
+                setup_types = []
         
         with col3:
-            time_filter = st.selectbox("Time Range", ["All", "Last Hour", "Last 4 Hours", "Today"])
+            if not df.empty:
+                symbols = st.multiselect(
+                    "Symbols",
+                    sorted(df['symbol'].unique().tolist()),
+                    default=sorted(df['symbol'].unique().tolist())[:5] if len(df['symbol'].unique()) > 5 else sorted(df['symbol'].unique().tolist())
+                )
+            else:
+                symbols = []
         
-        # Display results
-        st.subheader("Active Setups")
+        # Apply filters
+        filtered_df = df[
+            (df['confidence_score'] >= min_confidence) &
+            (df['structure_type'].isin(setup_types)) &
+            (df['symbol'].isin(symbols))
+        ].copy()
         
-        # This would filter and display your pipeline results
-        st.dataframe(df, use_container_width=True)
+        if filtered_df.empty:
+            st.warning("No data matches your filters. Try adjusting the criteria.")
+            return
         
-        # Setup summary
+        # Key metrics row
+        st.subheader("Pipeline Results")
+        
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Total Setups", len(df))
+            st.markdown(f"""
+            <div class="metric-container">
+                <h3>Total Setups</h3>
+                <h1>{len(filtered_df)}</h1>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col2:
-            high_conf = len(df[df['confidence_score'] >= 80])
-            st.metric("High Confidence", high_conf)
+            high_conf = len(filtered_df[filtered_df['confidence_score'] >= 85])
+            st.markdown(f"""
+            <div class="metric-container">
+                <h3>High Confidence</h3>
+                <h1>{high_conf}</h1>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col3:
-            big_moves = len(df[df['category'] == 'BIG_MOVE_ENHANCED'])
-            st.metric("Big Move Setups", big_moves)
+            avg_conf = filtered_df['confidence_score'].mean()
+            st.markdown(f"""
+            <div class="metric-container">
+                <h3>Avg Confidence</h3>
+                <h1>{avg_conf:.1f}%</h1>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col4:
-            recent = len(df[df['created_at'] >= datetime.now() - timedelta(hours=1)])
-            st.metric("Last Hour", recent)
-    
-    elif page == "Market Overview":
-        st.header("Market Overview")
+            try:
+                enhanced_strategies = len(filtered_df[filtered_df['category'] == 'ENHANCED_STRATEGY'])
+            except:
+                enhanced_strategies = 0
+                
+            st.markdown(f"""
+            <div class="metric-container">
+                <h3>Enhanced Strategies</h3>
+                <h1>{enhanced_strategies}</h1>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Market regime summary
-        st.subheader("Current Market Regime")
+        # Top setups
+        st.subheader("High Confidence Setups")
         
-        # This would pull from your market regime analysis
-        col1, col2, col3 = st.columns(3)
+        # Show priority 1 setups first
+        try:
+            priority_setups = filtered_df[filtered_df['priority'] == 1].head(10)
+        except:
+            priority_setups = filtered_df.sort_values('confidence_score', ascending=False).head(10)
+        
+        if not priority_setups.empty:
+            for _, setup in priority_setups.iterrows():
+                confidence_class = format_confidence_class(setup['confidence_score'])
+                
+                # Format distance
+                try:
+                    distance_display = f"{setup['distance_to_flip_pct']:+.2f}%"
+                except:
+                    distance_display = "N/A"
+                
+                st.markdown(f"""
+                <div class="setup-card {confidence_class}">
+                    <h4>{setup['symbol']} - {setup['confidence_score']}% Confidence</h4>
+                    <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
+                        <div>
+                            <strong>Setup:</strong> {setup['structure_type'].replace('_', ' ').title()}<br>
+                            <strong>Category:</strong> {setup.get('category', 'N/A')}
+                        </div>
+                        <div style="text-align: right;">
+                            <strong>Spot:</strong> ${setup['spot_price']:.2f}<br>
+                            <strong>Flip Point:</strong> ${setup['gamma_flip_point']:.2f}
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <strong>Distance:</strong> {distance_display} | 
+                        <strong>Priority:</strong> {setup.get('priority', 'N/A')} | 
+                        <strong>Recommendation:</strong> {setup.get('recommendation', 'N/A')}
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.9em; color: #666;">
+                        <strong>Created:</strong> {pd.to_datetime(setup['analysis_timestamp']).strftime('%m/%d %H:%M')}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No high-priority setups match your current filters")
+        
+        # Charts section
+        st.subheader("Analysis Charts")
+        
+        col1, col2 = st.columns(2)
         
         with col1:
-            st.metric("VIX Level", "14.9", "-0.3")
+            # Setup type distribution
+            setup_counts = filtered_df['structure_type'].value_counts()
+            
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=setup_counts.index,
+                values=setup_counts.values,
+                hole=0.4
+            )])
+            
+            fig_pie.update_layout(
+                title="Setup Type Distribution",
+                height=300,
+                template="plotly_white"
+            )
+            
+            st.plotly_chart(fig_pie, use_container_width=True)
         
         with col2:
-            st.metric("Market Regime", "LOW_VOLATILITY")
+            # Confidence distribution
+            confidence_bins = ['High (85%+)', 'Medium (70-84%)', 'Low (<70%)']
+            high = len(filtered_df[filtered_df['confidence_score'] >= 85])
+            medium = len(filtered_df[(filtered_df['confidence_score'] >= 70) & (filtered_df['confidence_score'] < 85)])
+            low = len(filtered_df[filtered_df['confidence_score'] < 70])
+            
+            fig_bar = go.Figure(data=[go.Bar(
+                x=confidence_bins,
+                y=[high, medium, low],
+                marker_color=['#28a745', '#ffc107', '#dc3545']
+            )])
+            
+            fig_bar.update_layout(
+                title="Confidence Score Distribution",
+                height=300,
+                yaxis_title="Number of Setups",
+                template="plotly_white"
+            )
+            
+            st.plotly_chart(fig_bar, use_container_width=True)
         
-        with col3:
-            st.metric("Total Market GEX", "25.4B", "+2.1B")
+        # Symbol performance chart
+        if len(filtered_df) > 0:
+            st.subheader("Top Symbols by Setup Count")
+            
+            symbol_counts = filtered_df['symbol'].value_counts().head(15)
+            
+            fig_symbol = go.Figure(data=[go.Bar(
+                x=symbol_counts.index,
+                y=symbol_counts.values,
+                marker_color='#007bff'
+            )])
+            
+            fig_symbol.update_layout(
+                title="Symbols with Most Setups",
+                height=400,
+                xaxis_title="Symbol",
+                yaxis_title="Number of Setups",
+                template="plotly_white"
+            )
+            
+            st.plotly_chart(fig_symbol, use_container_width=True)
         
-        # Recent activity
-        st.subheader("Recent Pipeline Activity")
-        st.info("Last pipeline run: 5 minutes ago - 99 symbols processed, 24 setups found")
+        # Complete data table
+        st.subheader("All Pipeline Results")
         
-        # Market conditions
-        st.subheader("Key Market Conditions")
+        # Format display columns
+        display_df = filtered_df.copy()
+        display_df['analysis_timestamp'] = pd.to_datetime(display_df['analysis_timestamp']).dt.strftime('%m/%d/%y %H:%M')
         
-        conditions = [
-            ("SPY", "NEGATIVE_GEX", "Watch for squeeze"),
-            ("QQQ", "MODERATE_POSITIVE_GEX", "Range trading opportunity"),
-            ("VIX", "NEGATIVE_GEX", "Watch for squeeze")
-        ]
+        # Rename columns for display
+        display_df = display_df.rename(columns={
+            'structure_type': 'Setup Type',
+            'confidence_score': 'Confidence %',
+            'spot_price': 'Spot Price',
+            'gamma_flip_point': 'Flip Point',
+            'distance_to_flip_pct': 'Distance %',
+            'analysis_timestamp': 'Created'
+        })
         
-        for symbol, regime, action in conditions:
-            col1, col2, col3 = st.columns([1, 2, 2])
-            with col1:
-                st.write(f"**{symbol}**")
-            with col2:
-                st.write(regime)
-            with col3:
-                st.write(action)
+        columns_to_display = ['symbol', 'Setup Type', 'Confidence %', 'Spot Price', 
+                           'Flip Point', 'Distance %', 'Created']
+        
+        # Add recommendation column if it exists
+        if 'recommendation' in display_df.columns:
+            columns_to_display.append('recommendation')
+        
+        # Add priority column if it exists
+        if 'priority' in display_df.columns:
+            columns_to_display.append('priority')
+        
+        st.dataframe(
+            display_df[columns_to_display],
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Download section
+        st.subheader("Export Data")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            csv = filtered_df.to_csv(index=False)
+            st.download_button(
+                "Download CSV",
+                csv,
+                f"gex_pipeline_results_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                "text/csv"
+            )
+        
+        with col2:
+            json_data = filtered_df.to_json(orient='records', indent=2)
+            st.download_button(
+                "Download JSON",
+                json_data,
+                f"gex_pipeline_results_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                "application/json"
+            )
+    
+    elif page == "Market Overview":
+        st.subheader("Market Overview")
+        
+        # Database connection
+        connection = init_databricks_connection()
+        if not connection:
+            st.error("Databricks connection unavailable - Market Overview requires database access")
+            return
+        
+        try:
+            # Get market overview data
+            cursor = connection.cursor()
+            
+            # Get overall market GEX data
+            market_query = """
+            SELECT 
+                symbol,
+                spot_price,
+                net_gex/1000000000 as net_gex_billions,
+                gamma_flip_point,
+                distance_to_flip_pct,
+                analysis_date,
+                analysis_timestamp
+            FROM quant_projects.gex_trading.scheduled_pipeline_results
+            WHERE symbol IN ('SPY', 'QQQ', 'IWM', 'DIA')
+            AND analysis_date >= current_date() - INTERVAL 1 DAY
+            ORDER BY analysis_timestamp DESC
+            LIMIT 20
+            """
+            
+            cursor.execute(market_query)
+            market_results = cursor.fetchall()
+            market_columns = [desc[0] for desc in cursor.description]
+            
+            market_df = pd.DataFrame(market_results, columns=market_columns)
+            
+            # Get market regime data
+            regime_query = """
+            SELECT 
+                regime_type,
+                regime_strength,
+                vix_level,
+                total_market_gex_billions,
+                analysis_date,
+                analysis_timestamp
+            FROM quant_projects.gex_trading.market_regime
+            WHERE analysis_date >= current_date() - INTERVAL 7 DAY
+            ORDER BY analysis_timestamp DESC
+            LIMIT 10
+            """
+            
+            try:
+                cursor.execute(regime_query)
+                regime_results = cursor.fetchall()
+                regime_columns = [desc[0] for desc in cursor.description]
+                regime_df = pd.DataFrame(regime_results, columns=regime_columns)
+            except:
+                # If market_regime table doesn't exist
+                regime_df = pd.DataFrame()
+            
+            cursor.close()
+            
+            # Display market data
+            if not market_df.empty:
+                latest_etfs = market_df.drop_duplicates('symbol', keep='first')
+                
+                st.subheader("Major ETF GEX Status")
+                
+                cols = st.columns(len(latest_etfs))
+                
+                for i, (_, row) in enumerate(latest_etfs.iterrows()):
+                    with cols[i]:
+                        # Determine if above or below flip
+                        above_flip = row['distance_to_flip_pct'] > 0
+                        color = "#28a745" if above_flip else "#dc3545"
+                        regime = "POSITIVE GEX" if row['net_gex_billions'] > 0 else "NEGATIVE GEX"
+                        
+                        st.markdown(f"""
+                        <div style="border: 1px solid {color}; border-radius: 10px; padding: 10px; text-align: center;">
+                            <h3>{row['symbol']}</h3>
+                            <div style="font-size: 24px; font-weight: bold;">${row['spot_price']:.2f}</div>
+                            <div style="color: {color};">{regime}</div>
+                            <hr>
+                            <div>Net GEX: {row['net_gex_billions']:.2f}B</div>
+                            <div>Flip: ${row['gamma_flip_point']:.2f}</div>
+                            <div>Distance: {row['distance_to_flip_pct']:+.2f}%</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Market regime
+                if not regime_df.empty:
+                    latest_regime = regime_df.iloc[0]
+                    
+                    st.subheader("Current Market Regime")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("Market Regime", latest_regime['regime_type'])
+                    
+                    with col2:
+                        st.metric("VIX Level", f"{latest_regime['vix_level']:.1f}")
+                    
+                    with col3:
+                        st.metric("Total Market GEX", f"{latest_regime['total_market_gex_billions']:.1f}B")
+                
+                # ETF GEX history chart
+                st.subheader("ETF Net GEX History")
+                
+                gex_history = market_df.copy()
+                gex_history['analysis_timestamp'] = pd.to_datetime(gex_history['analysis_timestamp'])
+                
+                fig = go.Figure()
+                
+                for symbol in gex_history['symbol'].unique():
+                    symbol_data = gex_history[gex_history['symbol'] == symbol]
+                    fig.add_trace(go.Scatter(
+                        x=symbol_data['analysis_timestamp'],
+                        y=symbol_data['net_gex_billions'],
+                        mode='lines+markers',
+                        name=symbol
+                    ))
+                
+                fig.update_layout(
+                    title="Net GEX History (Billions $)",
+                    xaxis_title="Date",
+                    yaxis_title="Net GEX (Billions)",
+                    height=400,
+                    template="plotly_white"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Recent interesting setups
+                st.subheader("Recent Interesting Setups")
+                
+                try:
+                    # Get interesting setups
+                    interesting_query = """
+                    SELECT 
+                        symbol,
+                        structure_type,
+                        confidence_score,
+                        analysis_timestamp
+                    FROM quant_projects.gex_trading.scheduled_pipeline_results
+                    WHERE confidence_score >= 80
+                    AND analysis_date >= current_date() - INTERVAL 1 DAY
+                    ORDER BY confidence_score DESC
+                    LIMIT 5
+                    """
+                    
+                    cursor = connection.cursor()
+                    cursor.execute(interesting_query)
+                    interesting_results = cursor.fetchall()
+                    interesting_columns = [desc[0] for desc in cursor.description]
+                    
+                    interesting_df = pd.DataFrame(interesting_results, columns=interesting_columns)
+                    cursor.close()
+                    
+                    if not interesting_df.empty:
+                        for _, row in interesting_df.iterrows():
+                            st.markdown(f"""
+                            <div style="border: 1px solid #28a745; border-radius: 10px; padding: 15px; margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <div><strong>{row['symbol']}</strong> - {row['structure_type'].replace('_', ' ').title()}</div>
+                                    <div>{row['confidence_score']}% confidence</div>
+                                </div>
+                                <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                    {pd.to_datetime(row['analysis_timestamp']).strftime('%m/%d/%y %H:%M')}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.info("No high confidence setups found in the last 24 hours")
+                        
+                except Exception as e:
+                    st.warning(f"Could not load interesting setups: {e}")
+                
+            else:
+                st.error("No market data available")
+                st.info("Make sure your pipeline has processed market ETFs (SPY, QQQ, IWM, DIA)")
+            
+        except Exception as e:
+            st.error(f"Failed to load market overview data: {e}")
     
     # Footer
     st.markdown("---")
-    st.markdown("GEX Trading Dashboard - Real-time gamma exposure analysis")
-    
-    # Auto-refresh logic
-    if auto_refresh and st.session_state.last_update:
-        if (datetime.now() - st.session_state.last_update).total_seconds() > 300:  # 5 minutes
-            st.rerun()
+    st.caption(f"GEX Master Pro - Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == "__main__":
     main()
