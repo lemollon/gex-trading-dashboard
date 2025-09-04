@@ -239,6 +239,54 @@ class Top100OptionsScanner:
         except Exception:
             return {'net_gex': 0, 'call_gex': 0, 'put_gex': 0}
     
+    def calculate_quick_gex(self, symbol, current_price):
+        """Quick GEX calculation for scanning"""
+        try:
+            ticker = yf.Ticker(symbol)
+            exp_dates = ticker.options[:3]  # Only first 3 expirations for speed
+            
+            total_gex = 0
+            total_call_gex = 0
+            total_put_gex = 0
+            
+            for exp_date in exp_dates:
+                try:
+                    exp_dt = datetime.strptime(exp_date, '%Y-%m-%d')
+                    dte = (exp_dt.date() - date.today()).days
+                    
+                    if dte <= 0 or dte > 45:
+                        continue
+                    
+                    chain = ticker.option_chain(exp_date)
+                    T = dte / 365.0
+                    
+                    # Quick gamma approximation
+                    for _, call in chain.calls.iterrows():
+                        if call['openInterest'] > 0:
+                            gamma = 0.01 * np.exp(-abs(call['strike'] - current_price) / current_price * 5)
+                            call_gex = current_price * gamma * call['openInterest'] * 100
+                            total_call_gex += call_gex
+                            total_gex += call_gex
+                    
+                    for _, put in chain.puts.iterrows():
+                        if put['openInterest'] > 0:
+                            gamma = 0.01 * np.exp(-abs(put['strike'] - current_price) / current_price * 5)
+                            put_gex = current_price * gamma * put['openInterest'] * 100
+                            total_put_gex += put_gex
+                            total_gex -= put_gex  # Puts are negative
+                
+                except Exception:
+                    continue
+            
+            return {
+                'net_gex': total_gex,
+                'call_gex': total_call_gex,
+                'put_gex': total_put_gex
+            }
+            
+        except Exception:
+            return {'net_gex': 0, 'call_gex': 0, 'put_gex': 0}
+    
     def scan_for_signals(self, top_symbols_df, max_symbols=50):
         """Scan top symbols for GEX signals"""
         
