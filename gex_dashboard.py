@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Production GEX Dashboard - Databricks Connected
-Real-time Gamma Exposure analysis for options trading
+Top 100 Options Volume GEX Scanner
+Real-time analysis of the most actively traded options
 """
 
 import streamlit as st
@@ -10,16 +10,18 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-from databricks import sql
+import yfinance as yf
+import requests
 from datetime import datetime, date, timedelta
-import os
 import time
+import concurrent.futures
+from threading import Lock
 import warnings
 warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="🎯 GEX Trading Dashboard",
+    page_title="🎯 Top 100 Options Volume GEX Scanner",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -38,922 +40,873 @@ st.markdown("""
         box-shadow: 0 8px 32px rgba(0,0,0,0.1);
     }
     
-    .metric-container {
+    .scanner-card {
         background: white;
-        padding: 1.5rem;
         border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        padding: 1rem;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         border-left: 4px solid #667eea;
-        margin: 1rem 0;
     }
     
-    .signal-high {
+    .high-signal {
+        border-left: 4px solid #28a745 !important;
         background: linear-gradient(135deg, #d4edda, #c3e6cb);
-        border: 1px solid #28a745;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
     }
     
-    .signal-medium {
+    .medium-signal {
+        border-left: 4px solid #ffc107 !important;
         background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-        border: 1px solid #ffc107;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.2);
     }
     
-    .signal-low {
+    .low-signal {
+        border-left: 4px solid #dc3545 !important;
         background: linear-gradient(135deg, #f8d7da, #fab1a0);
-        border: 1px solid #dc3545;
-        border-radius: 10px;
-        padding: 1.5rem;
+    }
+    
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
         margin: 1rem 0;
-        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.2);
     }
     
-    .status-indicator {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        margin-right: 8px;
+    .progress-container {
+        margin: 1rem 0;
     }
-    
-    .status-online { background: #28a745; }
-    .status-warning { background: #ffc107; }
-    .status-offline { background: #dc3545; }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>🎯 Gamma Exposure Trading Dashboard</h1>
-    <p><strong>Production System</strong> | Real-time options analytics powered by Databricks</p>
-    <p>Professional GEX analysis for institutional-grade trading decisions</p>
+    <h1>🎯 Top 100 Options Volume GEX Scanner</h1>
+    <p><strong>Real-Time Mass Analysis</strong> | Scanning highest options volume symbols for GEX opportunities</p>
+    <p>Professional-grade options flow analysis across the most liquid names</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Databricks connection with enhanced error handling
-@st.cache_resource
-def init_databricks_connection():
-    """Initialize production Databricks connection with comprehensive error handling"""
-    try:
-        # Connection parameters from environment or secrets
-        server_hostname = (
-            st.secrets.get("DATABRICKS_SERVER_HOSTNAME") or 
-            os.getenv("DATABRICKS_SERVER_HOSTNAME")
-        )
-        http_path = (
-            st.secrets.get("DATABRICKS_HTTP_PATH") or 
-            os.getenv("DATABRICKS_HTTP_PATH")
-        )
-        access_token = (
-            st.secrets.get("DATABRICKS_ACCESS_TOKEN") or 
-            os.getenv("DATABRICKS_ACCESS_TOKEN")
-        )
-        
-        if not all([server_hostname, http_path, access_token]):
-            st.error("❌ Missing Databricks credentials")
-            st.info("""
-            **Setup Required**: Configure the following in `.streamlit/secrets.toml`:
-            ```
-            DATABRICKS_SERVER_HOSTNAME = "your-workspace.cloud.databricks.com"
-            DATABRICKS_HTTP_PATH = "/sql/1.0/warehouses/your-warehouse-id"
-            DATABRICKS_ACCESS_TOKEN = "your-access-token"
-            ```
-            """)
-            return None
-        
-        connection = sql.connect(
-            server_hostname=server_hostname,
-            http_path=http_path,
-            access_token=access_token
-        )
-        
-        # Test connection
-        cursor = connection.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchall()
-        cursor.close()
-        
-        return connection
-        
-    except Exception as e:
-        st.error(f"❌ Databricks connection failed: {e}")
-        st.info("💡 Verify your Databricks credentials and warehouse status")
-        return None
-
-# Enhanced data loading functions with caching and error handling
-@st.cache_data(ttl=300, show_spinner=False)  # 5-minute cache
-def load_latest_analytics(symbol, connection):
-    """Load latest GEX analytics with comprehensive error handling"""
-    if connection is None:
-        return None
+class Top100OptionsScanner:
+    """Scanner for top 100 symbols by options volume"""
     
-    try:
-        cursor = connection.cursor()
+    def __init__(self):
+        self.risk_free_rate = 0.05
+        self.scan_lock = Lock()
+        self.results_cache = {}
         
-        query = f"""
-        SELECT 
-            symbol,
-            snapshot_date,
-            snapshot_time,
-            spot_price,
-            net_gex,
-            gamma_flip_point,
-            call_wall_1,
-            call_wall_2,
-            call_wall_3,
-            put_wall_1,
-            put_wall_2,
-            put_wall_3,
-            max_call_gex,
-            max_put_gex,
-            gex_concentration_ratio,
-            volatility_regime,
-            distance_to_flip_pct,
-            charm,
-            vanna
-        FROM gex_trading.options_data.gex_analytics
-        WHERE symbol = '{symbol}'
-        ORDER BY snapshot_time DESC
-        LIMIT 1
-        """
+        # Top 100 symbols by typical options volume (updated list)
+        self.top_symbols = [
+            # Major ETFs
+            "SPY", "QQQ", "IWM", "EEM", "GLD", "VIX", "XLF", "XLE", "XLK", "XLP",
+            "XLY", "XLI", "XLV", "XLU", "XLB", "XLRE", "XRT", "VXX", "UVXY", "SQQQ",
+            
+            # Mega Cap Tech
+            "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "TSLA", "META", "NVDA", "NFLX", "CRM",
+            "ORCL", "ADBE", "INTC", "AMD", "PYPL", "UBER", "LYFT", "SHOP", "SQ", "ZOOM",
+            
+            # Large Cap Growth
+            "BRK.B", "JPM", "JNJ", "UNH", "V", "MA", "HD", "PG", "KO", "PFE",
+            "DIS", "VZ", "T", "CSCO", "WMT", "BAC", "XOM", "CVX", "ABBV", "TMO",
+            
+            # High Beta/Meme Stocks
+            "GME", "AMC", "BB", "NOK", "PLTR", "WISH", "CLOV", "SPCE", "NIO", "XPEV",
+            "LI", "RIVN", "LCID", "F", "GM", "COIN", "HOOD", "SOFI", "ARKK", "ARKQ",
+            
+            # Finance & Energy
+            "GS", "MS", "C", "WFC", "USB", "PNC", "COF", "AXP", "BLK", "SCHW",
+            "SLB", "HAL", "OXY", "COP", "EOG", "DVN", "MRO", "APA", "FANG", "PXD",
+            
+            # Additional High Volume
+            "BA", "CAT", "IBM", "GE", "SNAP", "TWTR", "PINS", "ROKU", "DOCU", "ZM",
+            "BABA", "JD", "PDD", "DIDI", "TAL", "EDU", "BIDU", "IQ", "VIPS", "WB"
+        ]
+    
+    @st.cache_data(ttl=3600)
+    def get_options_volume_ranking(_self):
+        """Get current options volume ranking for top symbols"""
+        volume_data = []
         
-        cursor.execute(query)
-        result = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        cursor.close()
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        if result:
-            df = pd.DataFrame(result, columns=columns)
-            df['snapshot_time'] = pd.to_datetime(df['snapshot_time'])
+        for i, symbol in enumerate(_self.top_symbols):
+            try:
+                status_text.text(f"🔍 Checking options volume: {symbol} ({i+1}/{len(_self.top_symbols)})")
+                progress_bar.progress((i + 1) / len(_self.top_symbols))
+                
+                ticker = yf.Ticker(symbol)
+                
+                # Get current price
+                hist = ticker.history(period="1d")
+                if len(hist) == 0:
+                    continue
+                    
+                current_price = hist['Close'].iloc[-1]
+                
+                # Get first expiration to check options availability
+                try:
+                    exp_dates = ticker.options
+                    if not exp_dates:
+                        continue
+                        
+                    # Get options chain for first expiration
+                    chain = ticker.option_chain(exp_dates[0])
+                    
+                    # Calculate total volume and open interest
+                    call_volume = chain.calls['volume'].fillna(0).sum()
+                    put_volume = chain.puts['volume'].fillna(0).sum()
+                    total_volume = call_volume + put_volume
+                    
+                    call_oi = chain.calls['openInterest'].fillna(0).sum()
+                    put_oi = chain.puts['openInterest'].fillna(0).sum()
+                    total_oi = call_oi + put_oi
+                    
+                    volume_data.append({
+                        'symbol': symbol,
+                        'current_price': current_price,
+                        'call_volume': int(call_volume),
+                        'put_volume': int(put_volume),
+                        'total_volume': int(total_volume),
+                        'call_oi': int(call_oi),
+                        'put_oi': int(put_oi),
+                        'total_oi': int(total_oi),
+                        'put_call_ratio': put_volume / max(call_volume, 1),
+                        'last_updated': datetime.now()
+                    })
+                    
+                except Exception:
+                    continue
+                    
+            except Exception:
+                continue
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        if volume_data:
+            df = pd.DataFrame(volume_data)
+            # Sort by total volume (most active first)
+            df = df.sort_values('total_volume', ascending=False).reset_index(drop=True)
             return df
-        else:
-            return None
-            
-    except Exception as e:
-        st.error(f"❌ Error loading analytics for {symbol}: {e}")
-        return None
-
-@st.cache_data(ttl=300, show_spinner=False)
-def load_gex_profile(symbol, connection, snapshot_date=None):
-    """Load comprehensive GEX profile data"""
-    if connection is None:
-        return None
+        
+        return pd.DataFrame()
     
-    if snapshot_date is None:
-        snapshot_date = date.today()
-    
-    try:
-        cursor = connection.cursor()
-        
-        query = f"""
-        SELECT 
-            symbol,
-            strike,
-            call_gex,
-            put_gex,
-            net_gex,
-            call_gamma,
-            put_gamma,
-            net_gamma,
-            call_oi,
-            put_oi,
-            snapshot_date,
-            snapshot_time,
-            spot_price
-        FROM gex_trading.options_data.gex_profile
-        WHERE symbol = '{symbol}'
-        AND snapshot_date = '{snapshot_date}'
-        ORDER BY strike
-        """
-        
-        cursor.execute(query)
-        result = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        cursor.close()
-        
-        if result:
-            df = pd.DataFrame(result, columns=columns)
-            # Calculate cumulative GEX for analysis
-            df['cumulative_gex'] = df['net_gex'].cumsum()
-            return df
-        else:
-            return None
+    def calculate_quick_gex(self, symbol, current_price):
+        """Quick GEX calculation for scanning"""
+        try:
+            ticker = yf.Ticker(symbol)
+            exp_dates = ticker.options[:3]  # Only first 3 expirations for speed
             
-    except Exception as e:
-        st.error(f"❌ Error loading GEX profile for {symbol}: {e}")
-        return None
-
-@st.cache_data(ttl=180, show_spinner=False)  # 3-minute cache for signals
-def load_trading_signals(symbol, connection):
-    """Load active trading signals"""
-    if connection is None:
-        return None
-    
-    try:
-        cursor = connection.cursor()
-        
-        query = f"""
-        SELECT 
-            signal_id,
-            symbol,
-            signal_type,
-            confidence_score,
-            entry_price,
-            target_strike,
-            expiration_date,
-            strategy,
-            rationale,
-            risk_level,
-            max_loss_pct,
-            expected_return_pct,
-            signal_time,
-            signal_date,
-            is_active
-        FROM gex_trading.options_data.trading_signals
-        WHERE symbol = '{symbol}'
-        AND signal_date >= CURRENT_DATE() - 1
-        AND is_active = true
-        ORDER BY confidence_score DESC, signal_time DESC
-        """
-        
-        cursor.execute(query)
-        result = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        cursor.close()
-        
-        if result:
-            df = pd.DataFrame(result, columns=columns)
-            df['signal_time'] = pd.to_datetime(df['signal_time'])
-            df['expiration_date'] = pd.to_datetime(df['expiration_date'])
-            return df
-        else:
-            return None
+            total_gex = 0
+            total_call_gex = 0
+            total_put_gex = 0
             
-    except Exception as e:
-        st.error(f"❌ Error loading signals for {symbol}: {e}")
-        return None
-
-@st.cache_data(ttl=600, show_spinner=False)  # 10-minute cache for historical
-def load_historical_data(symbol, days_back, connection):
-    """Load historical GEX data for trend analysis"""
-    if connection is None:
-        return None
-    
-    try:
-        cursor = connection.cursor()
-        
-        cutoff_date = (date.today() - timedelta(days=days_back)).strftime('%Y-%m-%d')
-        
-        query = f"""
-        SELECT 
-            snapshot_date,
-            snapshot_time,
-            spot_price,
-            net_gex,
-            gamma_flip_point,
-            distance_to_flip_pct,
-            volatility_regime,
-            max_call_gex,
-            max_put_gex,
-            gex_concentration_ratio
-        FROM gex_trading.options_data.gex_analytics
-        WHERE symbol = '{symbol}'
-        AND snapshot_date >= '{cutoff_date}'
-        ORDER BY snapshot_time ASC
-        """
-        
-        cursor.execute(query)
-        result = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        cursor.close()
-        
-        if result:
-            df = pd.DataFrame(result, columns=columns)
-            df['snapshot_time'] = pd.to_datetime(df['snapshot_time'])
-            df['snapshot_date'] = pd.to_datetime(df['snapshot_date'])
-            return df
-        else:
-            return None
-            
-    except Exception as e:
-        st.error(f"❌ Error loading historical data for {symbol}: {e}")
-        return None
-
-def get_system_health(connection):
-    """Check system health and data freshness"""
-    if connection is None:
-        return {"status": "offline", "details": "No Databricks connection"}
-    
-    try:
-        cursor = connection.cursor()
-        
-        # Check latest data timestamp
-        cursor.execute("""
-        SELECT 
-            symbol,
-            MAX(analysis_timestamp) as latest_time,
-            COUNT(*) as record_count
-        FROM quant_projects.gex_trading.scheduled_pipeline_results
-        WHERE pipeline_date >= CURRENT_DATE() - 1
-        GROUP BY symbol
-        ORDER BY latest_time DESC
-        """)
-        
-        result = cursor.fetchall()
-        cursor.close()
-        
-        if result:
-            latest_time = result[0][1]
-            hours_old = (datetime.now() - pd.to_datetime(latest_time)).total_seconds() / 3600
-            
-            if hours_old < 1:
-                status = "online"
-            elif hours_old < 6:
-                status = "warning"
-            else:
-                status = "stale"
+            for exp_date in exp_dates:
+                try:
+                    exp_dt = datetime.strptime(exp_date, '%Y-%m-%d')
+                    dte = (exp_dt.date() - date.today()).days
+                    
+                    if dte <= 0 or dte > 45:
+                        continue
+                    
+                    chain = ticker.option_chain(exp_date)
+                    T = dte / 365.0
+                    
+                    # Quick gamma approximation
+                    for _, call in chain.calls.iterrows():
+                        if call['openInterest'] > 0:
+                            gamma = 0.01 * np.exp(-abs(call['strike'] - current_price) / current_price * 5)
+                            call_gex = current_price * gamma * call['openInterest'] * 100
+                            total_call_gex += call_gex
+                            total_gex += call_gex
+                    
+                    for _, put in chain.puts.iterrows():
+                        if put['openInterest'] > 0:
+                            gamma = 0.01 * np.exp(-abs(put['strike'] - current_price) / current_price * 5)
+                            put_gex = current_price * gamma * put['openInterest'] * 100
+                            total_put_gex += put_gex
+                            total_gex -= put_gex  # Puts are negative
+                
+                except Exception:
+                    continue
             
             return {
-                "status": status,
-                "latest_time": latest_time,
-                "hours_old": hours_old,
-                "symbols_count": len(result)
+                'net_gex': total_gex,
+                'call_gex': total_call_gex,
+                'put_gex': total_put_gex
             }
+            
+        except Exception:
+            return {'net_gex': 0, 'call_gex': 0, 'put_gex': 0}
+    
+    def scan_for_signals(self, top_symbols_df, max_symbols=50):
+        """Scan top symbols for GEX signals"""
+        
+        def process_symbol(row):
+            try:
+                symbol = row['symbol']
+                current_price = row['current_price']
+                
+                # Quick GEX calculation
+                gex_data = self.calculate_quick_gex(symbol, current_price)
+                
+                net_gex = gex_data['net_gex']
+                net_gex_millions = net_gex / 1e6
+                
+                # Simple signal detection
+                signals = []
+                confidence = 0
+                
+                # Negative GEX squeeze potential
+                if net_gex < -50e6:  # Less than -50M
+                    signals.append("SQUEEZE_POTENTIAL")
+                    confidence += 30
+                
+                # High positive GEX (range bound)
+                if net_gex > 100e6:  # More than 100M
+                    signals.append("RANGE_BOUND")
+                    confidence += 25
+                
+                # High options volume
+                if row['total_volume'] > 10000:
+                    confidence += 20
+                
+                # High open interest
+                if row['total_oi'] > 50000:
+                    confidence += 15
+                
+                # Put/call ratio analysis
+                pcr = row['put_call_ratio']
+                if pcr > 1.5:  # Heavy put activity
+                    signals.append("BEARISH_FLOW")
+                    confidence += 10
+                elif pcr < 0.5:  # Heavy call activity
+                    signals.append("BULLISH_FLOW")
+                    confidence += 10
+                
+                return {
+                    'symbol': symbol,
+                    'current_price': current_price,
+                    'net_gex_millions': round(net_gex_millions, 1),
+                    'call_gex_millions': round(gex_data['call_gex'] / 1e6, 1),
+                    'put_gex_millions': round(gex_data['put_gex'] / 1e6, 1),
+                    'total_volume': row['total_volume'],
+                    'total_oi': row['total_oi'],
+                    'put_call_ratio': round(pcr, 2),
+                    'signals': signals,
+                    'confidence': min(confidence, 100),
+                    'scan_time': datetime.now()
+                }
+                
+            except Exception as e:
+                return None
+        
+        # Process symbols in parallel for speed
+        results = []
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Take top symbols by volume
+        symbols_to_scan = top_symbols_df.head(max_symbols)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_symbol = {
+                executor.submit(process_symbol, row): row['symbol'] 
+                for _, row in symbols_to_scan.iterrows()
+            }
+            
+            completed = 0
+            for future in concurrent.futures.as_completed(future_to_symbol):
+                completed += 1
+                symbol = future_to_symbol[future]
+                
+                status_text.text(f"🔄 Analyzing GEX: {symbol} ({completed}/{len(symbols_to_scan)})")
+                progress_bar.progress(completed / len(symbols_to_scan))
+                
+                try:
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                except Exception as e:
+                    continue
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        if results:
+            results_df = pd.DataFrame(results)
+            # Sort by confidence score
+            results_df = results_df.sort_values('confidence', ascending=False).reset_index(drop=True)
+            return results_df
+        
+        return pd.DataFrame()
+
+# Initialize scanner
+@st.cache_resource
+def get_scanner():
+    return DynamicOptionsScanner()
+
+scanner = get_scanner()
+
+# Main interface with tabs
+tab1, tab2, tab3 = st.tabs(["🔍 Mass Scanner", "🎯 Custom Symbol Analysis", "📊 Detailed GEX Profile"])
+
+with tab1:
+    # Original mass scanner functionality
+    st.markdown("## 🔍 Real-Time Options Volume & GEX Scanner")
+    
+    # Sidebar controls for mass scanner
+    st.sidebar.header("🎛️ Mass Scanner Configuration")
+    
+    # Scanning parameters
+    max_symbols = st.sidebar.slider("Max Symbols to Analyze", 25, 150, 50, 5)
+    min_confidence = st.sidebar.slider("Minimum Confidence %", 0, 100, 25, 5)
+    volume_threshold = st.sidebar.number_input("Min Options Volume", 1000, 100000, 5000, 1000)
+    
+    # Signal filters
+    signal_filters = st.sidebar.multiselect(
+        "Signal Types to Show",
+        ["SQUEEZE_POTENTIAL", "RANGE_BOUND", "BEARISH_FLOW", "BULLISH_FLOW"],
+        default=["SQUEEZE_POTENTIAL", "RANGE_BOUND"]
+    )
+    
+    # Refresh controls
+    auto_scan = st.sidebar.checkbox("🔄 Auto-scan (30min)", value=False)
+    
+    if st.sidebar.button("🚀 Start New Scan", type="primary"):
+        st.cache_data.clear()
+        st.rerun()
+    
+    # Market overview
+    st.sidebar.markdown("**📊 Scan Parameters:**")
+    st.sidebar.markdown(f"• Symbols: Top {max_symbols} by volume")
+    st.sidebar.markdown(f"• Min Confidence: {min_confidence}%")
+    st.sidebar.markdown(f"• Min Volume: {volume_threshold:,}")
+    
+    # Step 1: Get options volume ranking
+    with st.expander("📊 Step 1: Dynamic Options Volume Ranking", expanded=True):
+        st.markdown("🔄 Scanning dynamic symbol list for current options activity...")
+        
+        volume_data = scanner.get_options_volume_ranking()
+        
+        if len(volume_data) > 0:
+            st.success(f"✅ Found {len(volume_data)} symbols with options data")
+            
+            # Show top 20 by volume
+            top_20 = volume_data.head(20)
+            
+            # Volume ranking chart
+            fig_volume = go.Figure()
+            
+            fig_volume.add_trace(go.Bar(
+                x=top_20['symbol'],
+                y=top_20['total_volume'],
+                name='Total Volume',
+                marker_color='rgba(54, 162, 235, 0.8)',
+                hovertemplate='<b>%{x}</b><br>Volume: %{y:,}<br>Price: $%{customdata:.2f}<extra></extra>',
+                customdata=top_20['current_price']
+            ))
+            
+            fig_volume.update_layout(
+                title="Top 20 Symbols by Options Volume (Live Update)",
+                xaxis_title="Symbol",
+                yaxis_title="Total Options Volume",
+                height=400
+            )
+            
+            st.plotly_chart(fig_volume, use_container_width=True)
+            
+            # Volume summary table
+            st.markdown("**📋 Top 20 by Options Volume:**")
+            display_cols = ['symbol', 'current_price', 'total_volume', 'total_oi', 'put_call_ratio']
+            formatted_df = top_20[display_cols].copy()
+            formatted_df['current_price'] = formatted_df['current_price'].round(2)
+            formatted_df['total_volume'] = formatted_df['total_volume'].apply(lambda x: f"{x:,}")
+            formatted_df['total_oi'] = formatted_df['total_oi'].apply(lambda x: f"{x:,}")
+            
+            st.dataframe(formatted_df, use_container_width=True)
+            
         else:
-            return {"status": "no_data", "details": "No recent data found"}
+            st.error("❌ No options data found. Please try again.")
+            st.stop()
+    
+    # Step 2: GEX Analysis (existing code continues...)
+    with st.expander("⚡ Step 2: GEX Signal Analysis", expanded=True):
+        st.markdown(f"Analyzing top {max_symbols} symbols for gamma exposure signals...")
+        
+        # Filter by volume threshold
+        filtered_volume = volume_data[volume_data['total_volume'] >= volume_threshold]
+        
+        if len(filtered_volume) == 0:
+            st.warning(f"⚠️ No symbols meet volume threshold of {volume_threshold:,}")
+            st.stop()
+        
+        # Run GEX scan
+        scan_results = scanner.scan_for_signals(filtered_volume, max_symbols)
+        
+        if len(scan_results) > 0:
+            # Filter by confidence and signals
+            filtered_results = scan_results[scan_results['confidence'] >= min_confidence]
             
-    except Exception as e:
-        return {"status": "error", "details": str(e)}
-
-# Sidebar configuration
-st.sidebar.header("🎛️ Dashboard Configuration")
-
-# Initialize connection
-with st.spinner("🔌 Connecting to Databricks..."):
-    connection = init_databricks_connection()
-
-if connection is None:
-    st.sidebar.error("❌ Databricks connection required")
-    st.stop()
-
-# System health check
-system_health = get_system_health(connection)
-status_color = {
-    "online": "🟢", "warning": "🟡", 
-    "stale": "🟠", "offline": "🔴", 
-    "error": "🔴", "no_data": "🟡"
-}
-st.sidebar.markdown(f"**System Status:** {status_color.get(system_health['status'], '⚪')} {system_health['status'].title()}")
-
-# Symbol selection with real-time data check
-available_symbols = ["SPY", "QQQ", "IWM", "AAPL", "TSLA", "NVDA", "MSFT", "AMZN", "GOOGL", "META"]
-symbol = st.sidebar.selectbox("📊 Select Symbol", available_symbols, index=0)
-
-# Time controls
-historical_days = st.sidebar.slider("📅 Historical Days", 7, 90, 30, 7)
-
-# Display options
-show_advanced = st.sidebar.checkbox("🧮 Advanced Analytics", value=True)
-show_historical = st.sidebar.checkbox("📈 Historical Analysis", value=True)
-auto_refresh = st.sidebar.checkbox("🔄 Auto-refresh (5min)", value=False)
-
-# Alert settings
-st.sidebar.subheader("🚨 Alert Settings")
-flip_alert_threshold = st.sidebar.slider("Flip Distance Alert (%)", 0.1, 2.0, 0.5, 0.1)
-gex_alert_threshold = st.sidebar.slider("GEX Change Alert (B)", 0.5, 5.0, 1.0, 0.5)
-
-# Manual refresh
-if st.sidebar.button("🔄 Refresh Data Now", type="primary"):
-    st.cache_data.clear()
-    st.rerun()
-
-# Main data loading with progress indicator
-with st.spinner(f"📡 Loading {symbol} data..."):
-    analytics_data = load_latest_analytics(symbol, connection)
-    gex_profile_data = load_gex_profile(symbol, connection)
-    signals_data = load_trading_signals(symbol, connection)
-    
-    if show_historical:
-        historical_data = load_historical_data(symbol, historical_days, connection)
-    else:
-        historical_data = None
-
-# Validate data availability
-if analytics_data is None or len(analytics_data) == 0:
-    st.error(f"❌ No analytics data found for {symbol}")
-    st.info("""
-    **Possible solutions:**
-    1. Check if the GEX engine has run today
-    2. Verify symbol is supported in your system
-    3. Ensure Databricks jobs are scheduled properly
-    """)
-    st.stop()
-
-# Extract latest analytics
-latest = analytics_data.iloc[0]
-
-# Alert system
-alerts = []
-if abs(latest['distance_to_flip_pct']) < flip_alert_threshold:
-    alerts.append(f"🔴 ALERT: Only {latest['distance_to_flip_pct']:.2f}% from gamma flip!")
-
-if alerts:
-    for alert in alerts:
-        st.warning(alert)
-
-# Main dashboard header with key metrics
-st.markdown(f"## 📊 {symbol} Live Analysis")
-st.markdown(f"*Last updated: {latest['snapshot_time'].strftime('%Y-%m-%d %H:%M:%S')} ET*")
-
-# Key metrics in columns
-col1, col2, col3, col4, col5 = st.columns(5)
-
-with col1:
-    price_change = "normal"  # Could calculate from historical data
-    st.metric(
-        "💰 Current Price",
-        f"${latest['spot_price']:.2f}",
-        delta=None
-    )
-
-with col2:
-    net_gex_b = latest['net_gex'] / 1e9
-    delta_color = "inverse" if net_gex_b < -1 else "normal"
-    st.metric(
-        "🌊 Net GEX",
-        f"{net_gex_b:.2f}B",
-        delta=None
-    )
-
-with col3:
-    flip_delta = latest['spot_price'] - latest['gamma_flip_point']
-    st.metric(
-        "⚡ Gamma Flip",
-        f"${latest['gamma_flip_point']:.2f}",
-        delta=f"{flip_delta:+.2f}"
-    )
-
-with col4:
-    distance_pct = latest['distance_to_flip_pct']
-    delta_color = "inverse" if abs(distance_pct) < 0.5 else "normal"
-    st.metric(
-        "📏 Distance to Flip",
-        f"{distance_pct:.2f}%",
-        delta=None
-    )
-
-with col5:
-    regime_map = {
-        "POSITIVE_GEX_SUPPRESSION": ("🟢", "Suppression"),
-        "NEGATIVE_GEX_AMPLIFICATION": ("🔴", "Amplification"), 
-        "NEUTRAL_GEX": ("🟡", "Neutral")
-    }
-    regime_emoji, regime_text = regime_map.get(latest['volatility_regime'], ("⚪", "Unknown"))
-    st.metric(
-        "📈 Regime",
-        f"{regime_emoji} {regime_text}",
-        delta=None
-    )
-
-# Main visualization section
-chart_tab1, chart_tab2, chart_tab3 = st.tabs(["📊 GEX Profile", "🎯 Trading Signals", "📈 Historical"])
-
-with chart_tab1:
-    if gex_profile_data is not None and len(gex_profile_data) > 0:
-        # Enhanced GEX profile chart
-        fig = make_subplots(
-            rows=2, cols=1,
-            row_heights=[0.7, 0.3],
-            subplot_titles=("Gamma Exposure by Strike", "Cumulative GEX"),
-            vertical_spacing=0.1
-        )
-        
-        # Main GEX chart
-        call_data = gex_profile_data[gex_profile_data['call_gex'] > 0]
-        put_data = gex_profile_data[gex_profile_data['put_gex'] < 0]
-        
-        if len(call_data) > 0:
-            fig.add_trace(
-                go.Bar(
-                    x=call_data['strike'],
-                    y=call_data['call_gex'] / 1e6,
-                    name='Call GEX',
-                    marker_color='rgba(34, 139, 34, 0.8)',
-                    hovertemplate='<b>Call Wall</b><br>Strike: $%{x}<br>GEX: %{y:.1f}M<br>OI: %{customdata}<extra></extra>',
-                    customdata=call_data['call_oi']
-                ), row=1, col=1
-            )
-        
-        if len(put_data) > 0:
-            fig.add_trace(
-                go.Bar(
-                    x=put_data['strike'],
-                    y=put_data['put_gex'] / 1e6,
-                    name='Put GEX',
-                    marker_color='rgba(220, 20, 60, 0.8)',
-                    hovertemplate='<b>Put Wall</b><br>Strike: $%{x}<br>GEX: %{y:.1f}M<br>OI: %{customdata}<extra></extra>',
-                    customdata=put_data['put_oi']
-                ), row=1, col=1
-            )
-        
-        # Add key level lines
-        fig.add_vline(x=latest['spot_price'], line_dash="solid", line_color="blue", 
-                     annotation_text=f"Spot: ${latest['spot_price']:.2f}", row=1, col=1)
-        fig.add_vline(x=latest['gamma_flip_point'], line_dash="dash", line_color="orange",
-                     annotation_text=f"Flip: ${latest['gamma_flip_point']:.2f}", row=1, col=1)
-        
-        # Add major walls
-        if pd.notna(latest['call_wall_1']):
-            fig.add_vline(x=latest['call_wall_1'], line_dash="dot", line_color="green",
-                         annotation_text=f"Call Wall: ${latest['call_wall_1']:.2f}", row=1, col=1)
-        
-        if pd.notna(latest['put_wall_1']):
-            fig.add_vline(x=latest['put_wall_1'], line_dash="dot", line_color="red",
-                         annotation_text=f"Put Wall: ${latest['put_wall_1']:.2f}", row=1, col=1)
-        
-        # Cumulative GEX
-        fig.add_trace(
-            go.Scatter(
-                x=gex_profile_data['strike'],
-                y=gex_profile_data['cumulative_gex'] / 1e9,
-                mode='lines',
-                name='Cumulative GEX',
-                line=dict(color='purple', width=3),
-                hovertemplate='Strike: $%{x}<br>Cumulative: %{y:.2f}B<extra></extra>'
-            ), row=2, col=1
-        )
-        
-        fig.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
-        
-        fig.update_layout(
-            height=700,
-            showlegend=True,
-            title=f"{symbol} Comprehensive GEX Analysis",
-            hovermode='x unified'
-        )
-        
-        fig.update_xaxes(title_text="Strike Price ($)", row=2, col=1)
-        fig.update_yaxes(title_text="GEX (Millions)", row=1, col=1)
-        fig.update_yaxes(title_text="Cumulative GEX (Billions)", row=2, col=1)
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Key levels summary
-        levels_col1, levels_col2 = st.columns(2)
-        
-        with levels_col1:
-            st.markdown("**🟢 Call Walls (Resistance)**")
-            for i, wall in enumerate(['call_wall_1', 'call_wall_2', 'call_wall_3'], 1):
-                if pd.notna(latest[wall]):
-                    distance = ((latest[wall] - latest['spot_price']) / latest['spot_price']) * 100
-                    st.markdown(f"**{i}.** ${latest[wall]:.2f} (+{distance:.1f}%)")
-        
-        with levels_col2:
-            st.markdown("**🔴 Put Walls (Support)**")
-            for i, wall in enumerate(['put_wall_1', 'put_wall_2', 'put_wall_3'], 1):
-                if pd.notna(latest[wall]):
-                    distance = ((latest[wall] - latest['spot_price']) / latest['spot_price']) * 100
-                    st.markdown(f"**{i}.** ${latest[wall]:.2f} ({distance:.1f}%)")
-    
-    else:
-        st.warning(f"⚠️ No GEX profile data available for {symbol}")
-
-with chart_tab2:
-    st.subheader("🎯 Live Trading Signals")
-    
-    if signals_data is not None and len(signals_data) > 0:
-        for _, signal in signals_data.iterrows():
-            confidence = signal['confidence_score']
+            if len(signal_filters) > 0:
+                filtered_results = filtered_results[
+                    filtered_results['signals'].apply(
+                        lambda x: any(signal in x for signal in signal_filters)
+                    )
+                ]
             
-            # Determine signal styling
-            if confidence >= 75:
-                signal_class = "signal-high"
-                confidence_emoji = "🟢"
-                confidence_text = "HIGH"
-            elif confidence >= 50:
-                signal_class = "signal-medium"
-                confidence_emoji = "🟡"
-                confidence_text = "MEDIUM"
+            st.success(f"✅ Found {len(filtered_results)} signals meeting criteria")
+            
+            # Results overview
+            if len(filtered_results) > 0:
+                # Summary metrics
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    high_conf = len(filtered_results[filtered_results['confidence'] >= 75])
+                    st.metric("High Confidence", high_conf)
+                
+                with col2:
+                    avg_confidence = filtered_results['confidence'].mean()
+                    st.metric("Avg Confidence", f"{avg_confidence:.0f}%")
+                
+                with col3:
+                    total_gex = filtered_results['net_gex_millions'].sum()
+                    st.metric("Total Net GEX", f"{total_gex:.0f}M")
+                
+                with col4:
+                    bullish_signals = len(filtered_results[filtered_results['net_gex_millions'] > 0])
+                    st.metric("Bullish Signals", bullish_signals)
+                
+                # Signal distribution chart
+                fig_signals = px.scatter(
+                    filtered_results,
+                    x='total_volume',
+                    y='net_gex_millions',
+                    size='confidence',
+                    color='confidence',
+                    hover_name='symbol',
+                    title="GEX vs Options Volume",
+                    color_continuous_scale='RdYlGn'
+                )
+                
+                fig_signals.update_layout(height=500)
+                st.plotly_chart(fig_signals, use_container_width=True)
+                
+                # Detailed results
+                st.markdown("### 🎯 Detailed Signal Analysis")
+                
+                for _, result in filtered_results.head(20).iterrows():  # Show top 20
+                    confidence = result['confidence']
+                    
+                    if confidence >= 75:
+                        card_class = "scanner-card high-signal"
+                        conf_emoji = "🟢"
+                    elif confidence >= 50:
+                        card_class = "scanner-card medium-signal"
+                        conf_emoji = "🟡"
+                    else:
+                        card_class = "scanner-card low-signal"
+                        conf_emoji = "🔴"
+                    
+                    signals_text = ", ".join(result['signals']) if result['signals'] else "No specific signals"
+                    
+                    st.markdown(f"""
+                    <div class="{card_class}">
+                        <h4>{conf_emoji} {result['symbol']} - {confidence:.0f}% Confidence</h4>
+                        <div class="metric-grid">
+                            <div><strong>Price:</strong> ${result['current_price']:.2f}</div>
+                            <div><strong>Net GEX:</strong> {result['net_gex_millions']:.1f}M</div>
+                            <div><strong>Options Volume:</strong> {result['total_volume']:,}</div>
+                            <div><strong>P/C Ratio:</strong> {result['put_call_ratio']}</div>
+                        </div>
+                        <p><strong>🎯 Signals:</strong> {signals_text}</p>
+                        <p><strong>📊 Analysis:</strong> Call GEX: {result['call_gex_millions']:.1f}M | Put GEX: {result['put_gex_millions']:.1f}M | OI: {result['total_oi']:,}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
             else:
-                signal_class = "signal-low"
-                confidence_emoji = "🔴"
-                confidence_text = "LOW"
+                st.warning("⚠️ No signals meet current filter criteria")
+                st.info("Try lowering the confidence threshold or adjusting signal filters")
+        
+        else:
+            st.error("❌ GEX analysis failed. Please try again with different parameters.")
+
+with tab2:
+    # Custom symbol analysis
+    st.markdown("## 🎯 Custom Symbol Analysis")
+    st.markdown("Enter any symbol to get comprehensive GEX and options analysis")
+    
+    # Symbol input
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        custom_symbol = st.text_input(
+            "🔍 Enter Symbol (e.g., AAPL, TSLA, NVDA)",
+            placeholder="Type any stock symbol...",
+            key="custom_symbol_input"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        analyze_button = st.button("📊 Analyze Symbol", type="primary")
+    
+    # Popular symbols quick access
+    st.markdown("**Quick Access:**")
+    quick_symbols = ["AAPL", "TSLA", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "SPY", "QQQ", "IWM"]
+    
+    quick_cols = st.columns(5)
+    for i, sym in enumerate(quick_symbols):
+        with quick_cols[i % 5]:
+            if st.button(sym, key=f"quick_{sym}"):
+                custom_symbol = sym
+                analyze_button = True
+    
+    # Analysis section
+    if (analyze_button or custom_symbol) and custom_symbol:
+        with st.spinner(f"🔄 Analyzing {custom_symbol.upper()}..."):
+            analysis = scanner.analyze_custom_symbol(custom_symbol)
+        
+        if analysis and 'error' not in analysis:
+            # Success - show comprehensive analysis
+            st.success(f"✅ Analysis complete for {analysis['symbol']}")
             
-            # Calculate time since signal
-            time_diff = datetime.now() - signal['signal_time']
-            hours_old = time_diff.total_seconds() / 3600
-            
-            if hours_old < 1:
-                age_text = f"{int(time_diff.total_seconds() / 60)} minutes ago"
-            else:
-                age_text = f"{int(hours_old)} hours ago"
-            
-            # Risk/reward ratio
-            rr_ratio = signal['expected_return_pct'] / max(signal['max_loss_pct'], 1)
-            
+            # Company header
             st.markdown(f"""
-            <div class="{signal_class}">
-                <h4>{confidence_emoji} {signal['strategy']} - {confidence:.0f}% Confidence ({confidence_text})</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-                    <div>
-                        <p><strong>🎯 Action:</strong> {signal['signal_type']}</p>
-                        <p><strong>💰 Target Strike:</strong> ${signal['target_strike']:.0f}</p>
-                        <p><strong>📅 Expiration:</strong> {signal['expiration_date'].strftime('%Y-%m-%d')}</p>
-                        <p><strong>⚠️ Risk Level:</strong> {signal['risk_level']}</p>
-                    </div>
-                    <div>
-                        <p><strong>📈 Expected Return:</strong> {signal['expected_return_pct']:.0f}%</p>
-                        <p><strong>📉 Max Loss:</strong> {signal['max_loss_pct']:.0f}%</p>
-                        <p><strong>⚖️ Risk/Reward:</strong> 1:{rr_ratio:.1f}</p>
-                        <p><strong>🕒 Generated:</strong> {age_text}</p>
-                    </div>
-                </div>
-                <p style="margin-top: 1rem;"><strong>💡 Rationale:</strong> {signal['rationale']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("⚪ No active trading signals for today")
-        st.markdown("""
-        **Signals are generated when:**
-        - Net GEX crosses key thresholds (±1B)
-        - Price approaches gamma flip point (±0.5%)
-        - Strong wall formations are detected
-        - High concentration setups emerge
-        """)
-
-with chart_tab3:
-    if show_historical and historical_data is not None and len(historical_data) > 0:
-        st.subheader(f"📈 Historical Analysis ({historical_days} days)")
+            ### 📈 {analysis['symbol']} - {analysis.get('company_name', 'Unknown')}
+            **Sector:** {analysis.get('sector', 'Unknown')} | **Market Cap:** ${analysis.get('market_cap', 0)/1e9:.1f}B
+            """)
+            
+            # Key metrics
+            metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
+            
+            with metric_col1:
+                price_emoji = "🟢" if analysis['price_change'] > 0 else "🔴" if analysis['price_change'] < 0 else "⚪"
+                st.metric(
+                    f"{price_emoji} Current Price",
+                    f"${analysis['current_price']:.2f}",
+                    f"{analysis['price_change']:+.2f}%"
+                )
+            
+            with metric_col2:
+                net_gex_m = analysis['net_gex'] / 1e6
+                gex_emoji = "🟢" if net_gex_m > 0 else "🔴" if net_gex_m < -50 else "🟡"
+                st.metric(f"{gex_emoji} Net GEX", f"{net_gex_m:.0f}M")
+            
+            with metric_col3:
+                st.metric("📊 Options Volume", f"{analysis['total_volume']:,}")
+            
+            with metric_col4:
+                st.metric("🏗️ Open Interest", f"{analysis['total_oi']:,}")
+            
+            with metric_col5:
+                confidence = analysis['confidence']
+                conf_emoji = "🟢" if confidence >= 75 else "🟡" if confidence >= 50 else "🔴"
+                st.metric(f"{conf_emoji} Confidence", f"{confidence:.0f}%")
+            
+            # Signals analysis
+            if analysis['signals']:
+                st.markdown("### 🎯 Trading Signals")
+                
+                signal_descriptions = {
+                    'NEGATIVE_GEX_SQUEEZE': '🔴 Negative GEX Squeeze - Long calls potential',
+                    'POSITIVE_GEX_RANGE': '🟢 Positive GEX Range - Iron condor setup',
+                    'HIGH_VOLUME': '📊 High Options Volume - Increased liquidity',
+                    'HIGH_OPEN_INTEREST': '🏗️ High Open Interest - Strong positioning',
+                    'HIGH_MOMENTUM': '⚡ High Price Momentum - Trend continuation',
+                    'BEARISH_POSITIONING': '🐻 Bearish Positioning - Put heavy',
+                    'BULLISH_POSITIONING': '🐂 Bullish Positioning - Call heavy'
+                }
+                
+                for signal in analysis['signals']:
+                    st.markdown(f"• {signal_descriptions.get(signal, signal)}")
+            
+            # GEX breakdown
+            st.markdown("### ⚡ Gamma Exposure Breakdown")
+            
+            gex_col1, gex_col2 = st.columns(2)
+            
+            with gex_col1:
+                # GEX metrics
+                call_gex_m = analysis['total_call_gex'] / 1e6
+                put_gex_m = analysis['total_put_gex'] / 1e6
+                
+                st.markdown(f"""
+                **Call GEX:** {call_gex_m:.1f}M  
+                **Put GEX:** {put_gex_m:.1f}M  
+                **Net GEX:** {net_gex_m:.1f}M  
+                **Put/Call Ratio:** {analysis['put_call_ratio']:.2f}
+                """)
+            
+            with gex_col2:
+                # Simple GEX visualization
+                fig_pie = go.Figure(data=[go.Pie(
+                    labels=['Call GEX', 'Put GEX'],
+                    values=[abs(call_gex_m), abs(put_gex_m)],
+                    hole=.3,
+                    marker_colors=['green', 'red']
+                )])
+                
+                fig_pie.update_layout(
+                    title="GEX Distribution",
+                    height=300,
+                    showlegend=True
+                )
+                
+                st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # Expiration analysis
+            if analysis.get('expiration_analysis'):
+                st.markdown("### 📅 Expiration Analysis")
+                
+                exp_df = pd.DataFrame(analysis['expiration_analysis'])
+                exp_df['net_gex_millions'] = exp_df['net_gex'] / 1e6
+                
+                fig_exp = go.Figure()
+                
+                fig_exp.add_trace(go.Bar(
+                    x=exp_df['expiration'],
+                    y=exp_df['net_gex_millions'],
+                    name='Net GEX by Expiration',
+                    marker_color=['green' if x > 0 else 'red' for x in exp_df['net_gex_millions']]
+                ))
+                
+                fig_exp.update_layout(
+                    title="Net GEX by Expiration",
+                    xaxis_title="Expiration Date",
+                    yaxis_title="Net GEX (Millions)",
+                    height=400
+                )
+                
+                st.plotly_chart(fig_exp, use_container_width=True)
+                
+                st.dataframe(exp_df[['expiration', 'dte', 'net_gex_millions', 'volume', 'open_interest']], use_container_width=True)
         
-        # Historical trend charts
-        hist_fig = make_subplots(
-            rows=3, cols=1,
-            subplot_titles=("Net GEX Trend", "Distance to Flip", "Volatility Regime"),
-            vertical_spacing=0.1,
-            row_heights=[0.4, 0.4, 0.2]
-        )
+        elif analysis and 'error' in analysis:
+            st.error(f"❌ {analysis['error']}")
+            if 'current_price' in analysis:
+                st.info(f"Current price: ${analysis['current_price']:.2f}")
         
-        # Net GEX trend
-        hist_fig.add_trace(
-            go.Scatter(
-                x=historical_data['snapshot_date'],
-                y=historical_data['net_gex'] / 1e9,
-                mode='lines+markers',
-                name='Net GEX (B)',
-                line=dict(color='blue', width=2),
-                hovertemplate='Date: %{x}<br>Net GEX: %{y:.2f}B<extra></extra>'
-            ), row=1, col=1
-        )
-        
-        hist_fig.add_hline(y=0, line_dash="dash", line_color="gray", row=1, col=1)
-        hist_fig.add_hline(y=1, line_dash="dot", line_color="green", row=1, col=1)
-        hist_fig.add_hline(y=-1, line_dash="dot", line_color="red", row=1, col=1)
-        
-        # Distance to flip
-        hist_fig.add_trace(
-            go.Scatter(
-                x=historical_data['snapshot_date'],
-                y=historical_data['distance_to_flip_pct'],
-                mode='lines+markers',
-                name='Distance to Flip (%)',
-                line=dict(color='orange', width=2),
-                hovertemplate='Date: %{x}<br>Distance: %{y:.2f}%<extra></extra>'
-            ), row=2, col=1
-        )
-        
-        hist_fig.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
-        
-        # Regime visualization
-        regime_numeric = historical_data['volatility_regime'].map({
-            'POSITIVE_GEX_SUPPRESSION': 1,
-            'NEGATIVE_GEX_AMPLIFICATION': -1,
-            'NEUTRAL_GEX': 0
-        })
-        
-        hist_fig.add_trace(
-            go.Scatter(
-                x=historical_data['snapshot_date'],
-                y=regime_numeric,
-                mode='markers',
-                name='Regime',
-                marker=dict(
-                    color=regime_numeric,
-                    colorscale=[[0, 'red'], [0.5, 'yellow'], [1, 'green']],
-                    size=8
-                ),
-                hovertemplate='Date: %{x}<br>Regime: %{text}<extra></extra>',
-                text=historical_data['volatility_regime']
-            ), row=3, col=1
-        )
-        
-        hist_fig.update_layout(
-            height=800,
-            showlegend=False,
-            title=f"{symbol} Historical GEX Analysis"
-        )
-        
-        hist_fig.update_yaxes(title_text="Net GEX (B)", row=1, col=1)
-        hist_fig.update_yaxes(title_text="Distance (%)", row=2, col=1)
-        hist_fig.update_yaxes(title_text="Regime", tickvals=[-1, 0, 1], 
-                             ticktext=['Amplification', 'Neutral', 'Suppression'], row=3, col=1)
-        
-        st.plotly_chart(hist_fig, use_container_width=True)
-        
-        # Historical statistics
-        hist_col1, hist_col2, hist_col3, hist_col4 = st.columns(4)
-        
-        with hist_col1:
-            avg_gex = historical_data['net_gex'].mean() / 1e9
-            st.metric("Avg Net GEX", f"{avg_gex:.2f}B")
-        
-        with hist_col2:
-            avg_distance = historical_data['distance_to_flip_pct'].mean()
-            st.metric("Avg Distance to Flip", f"{avg_distance:.2f}%")
-        
-        with hist_col3:
-            volatility = historical_data['spot_price'].std() / historical_data['spot_price'].mean() * 100
-            st.metric("Price Volatility", f"{volatility:.1f}%")
-        
-        with hist_col4:
-            regime_counts = historical_data['volatility_regime'].value_counts()
-            dominant = regime_counts.index[0].split('_')[0] if len(regime_counts) > 0 else "N/A"
-            st.metric("Dominant Regime", dominant)
-
-# Advanced analytics section
-if show_advanced:
-    st.subheader("🧮 Advanced Analytics")
-    
-    adv_col1, adv_col2, adv_col3 = st.columns(3)
-    
-    with adv_col1:
-        st.markdown("**🎯 Setup Probabilities**")
-        
-        # Enhanced probability calculations
-        net_gex_b = latest['net_gex'] / 1e9
-        distance = latest['distance_to_flip_pct']
-        concentration = latest['gex_concentration_ratio']
-        
-        # Negative GEX squeeze
-        if net_gex_b < -1 and distance < -0.5:
-            squeeze_prob = min(95, 70 + abs(distance) * 10 + abs(net_gex_b) * 5)
         else:
-            squeeze_prob = max(5, 30 - abs(distance) * 5)
-        
-        # Positive GEX breakdown
-        if net_gex_b > 2 and abs(distance) < 0.3:
-            breakdown_prob = min(95, 75 + (0.3 / max(0.01, abs(distance))) * 5)
-        else:
-            breakdown_prob = max(5, 25 - max(0, net_gex_b - 1) * 10)
-        
-        # Iron condor
-        if net_gex_b > 1 and concentration > 0.6:
-            condor_prob = min(90, 50 + concentration * 40)
-        else:
-            condor_prob = max(10, 20 + concentration * 30)
-        
-        probabilities = {
-            "🔴 Negative GEX Squeeze": squeeze_prob,
-            "🟡 Positive GEX Breakdown": breakdown_prob,
-            "🟢 Iron Condor": condor_prob
-        }
-        
-        for setup, prob in probabilities.items():
-            color = "🟢" if prob > 70 else "🟡" if prob > 40 else "🔴"
-            st.markdown(f"{setup}: **{prob:.0f}%** {color}")
-    
-    with adv_col2:
-        st.markdown("**⚡ Greeks Analysis**")
-        
-        if pd.notna(latest['charm']) and pd.notna(latest['vanna']):
-            st.markdown(f"**Charm (γ decay):** {latest['charm']:.2e}")
-            st.markdown(f"**Vanna (γ vol sens):** {latest['vanna']:.2e}")
-        
-        # Additional calculated metrics
-        if latest['max_put_gex'] > 0:
-            gex_skew = latest['max_call_gex'] / latest['max_put_gex']
-            st.markdown(f"**GEX Skew:** {gex_skew:.2f}")
-        
-        st.markdown(f"**Concentration:** {latest['gex_concentration_ratio']:.1%}")
-        
-        # Market microstructure insights
-        if abs(latest['distance_to_flip_pct']) < 0.5:
-            st.markdown("🔥 **High gamma environment**")
-        elif latest['net_gex'] > 3e9:
-            st.markdown("🛡️ **Strong dealer hedging**")
-        elif latest['net_gex'] < -1e9:
-            st.markdown("⚡ **Volatility amplification zone**")
-    
-    with adv_col3:
-        st.markdown("**🚨 Risk Monitoring**")
-        
-        risk_alerts = []
-        
-        # Risk assessment
-        if abs(latest['distance_to_flip_pct']) < 0.25:
-            risk_alerts.append("🔴 Critical: Very close to flip!")
-        
-        if latest['gex_concentration_ratio'] > 0.8:
-            risk_alerts.append("⚠️ Warning: Extreme concentration")
-        
-        if abs(latest['net_gex']) > 3e9:
-            risk_alerts.append("🟡 Notice: High GEX levels")
-        
-        # Wall proximity checks
-        current_price = latest['spot_price']
-        
-        for wall_type, wall_col in [("Call", "call_wall_1"), ("Put", "put_wall_1")]:
-            if pd.notna(latest[wall_col]):
-                wall_distance = abs(current_price - latest[wall_col]) / current_price
-                if wall_distance < 0.005:  # Within 0.5%
-                    emoji = "🟢" if wall_type == "Call" else "🔴"
-                    risk_alerts.append(f"{emoji} At {wall_type.lower()} wall!")
-        
-        if not risk_alerts:
-            risk_alerts.append("✅ No active risk alerts")
-        
-        for alert in risk_alerts:
-            st.markdown(alert)
+            st.error(f"❌ Unable to analyze {custom_symbol.upper()}")
 
-# Footer with system information and tools
+with tab3:
+    # Detailed GEX profile
+    st.markdown("## 📊 Detailed Strike-by-Strike GEX Profile")
+    st.markdown("Get comprehensive gamma wall analysis with strike-level detail")
+    
+    # Symbol input for detailed analysis
+    detail_col1, detail_col2 = st.columns([3, 1])
+    
+    with detail_col1:
+        detail_symbol = st.text_input(
+            "🔍 Enter Symbol for Detailed Analysis",
+            placeholder="e.g., SPY, QQQ, AAPL...",
+            key="detail_symbol_input"
+        )
+    
+    with detail_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        detail_button = st.button("📊 Get Detailed Profile", type="primary")
+    
+    if (detail_button or detail_symbol) and detail_symbol:
+        with st.spinner(f"🔄 Building detailed GEX profile for {detail_symbol.upper()}..."):
+            gex_profile = scanner.get_detailed_gex_profile(detail_symbol)
+        
+        if gex_profile:
+            st.success(f"✅ Detailed GEX profile ready for {detail_symbol.upper()}")
+            
+            current_price = gex_profile['current_price']
+            gamma_flip = gex_profile['gamma_flip']
+            strike_data = gex_profile['strike_data']
+            
+            # Key levels summary
+            level_col1, level_col2, level_col3 = st.columns(3)
+            
+            with level_col1:
+                st.metric("💰 Current Price", f"${current_price:.2f}")
+            
+            with level_col2:
+                st.metric("⚡ Gamma Flip", f"${gamma_flip:.2f}")
+            
+            with level_col3:
+                distance_to_flip = ((current_price - gamma_flip) / current_price) * 100
+                st.metric("📏 Distance to Flip", f"{distance_to_flip:.2f}%")
+            
+            # Detailed GEX chart
+            fig_detail = make_subplots(
+                rows=2, cols=1,
+                row_heights=[0.7, 0.3],
+                subplot_titles=(f"{detail_symbol.upper()} Strike-by-Strike GEX", "Cumulative GEX"),
+                vertical_spacing=0.1
+            )
+            
+            # Main GEX bars
+            call_strikes = strike_data[strike_data['call_gex'] > 0]
+            put_strikes = strike_data[strike_data['put_gex'] < 0]
+            
+            if len(call_strikes) > 0:
+                fig_detail.add_trace(
+                    go.Bar(
+                        x=call_strikes['strike'],
+                        y=call_strikes['call_gex'] / 1e6,
+                        name='Call GEX',
+                        marker_color='rgba(34, 139, 34, 0.8)',
+                        hovertemplate='<b>Call Wall</b><br>Strike: $%{x}<br>GEX: %{y:.1f}M<br>OI: %{customdata}<extra></extra>',
+                        customdata=call_strikes['call_oi']
+                    ), row=1, col=1
+                )
+            
+            if len(put_strikes) > 0:
+                fig_detail.add_trace(
+                    go.Bar(
+                        x=put_strikes['strike'],
+                        y=put_strikes['put_gex'] / 1e6,
+                        name='Put GEX',
+                        marker_color='rgba(220, 20, 60, 0.8)',
+                        hovertemplate='<b>Put Wall</b><br>Strike: $%{x}<br>GEX: %{y:.1f}M<br>OI: %{customdata}<extra></extra>',
+                        customdata=put_strikes['put_oi']
+                    ), row=1, col=1
+                )
+            
+            # Add key levels
+            fig_detail.add_vline(x=current_price, line_dash="solid", line_color="blue",
+                               annotation_text=f"Current: ${current_price:.2f}", row=1, col=1)
+            fig_detail.add_vline(x=gamma_flip, line_dash="dash", line_color="orange",
+                               annotation_text=f"Flip: ${gamma_flip:.2f}", row=1, col=1)
+            
+            # Major walls
+            if len(gex_profile['call_walls']) > 0:
+                call_wall = gex_profile['call_walls'].iloc[0]['strike']
+                fig_detail.add_vline(x=call_wall, line_dash="dot", line_color="green",
+                                   annotation_text=f"Call Wall: ${call_wall:.2f}", row=1, col=1)
+            
+            if len(gex_profile['put_walls']) > 0:
+                put_wall = gex_profile['put_walls'].iloc[0]['strike']
+                fig_detail.add_vline(x=put_wall, line_dash="dot", line_color="red",
+                                   annotation_text=f"Put Wall: ${put_wall:.2f}", row=1, col=1)
+            
+            # Cumulative GEX
+            fig_detail.add_trace(
+                go.Scatter(
+                    x=strike_data['strike'],
+                    y=strike_data['cumulative_gex'] / 1e6,
+                    mode='lines',
+                    name='Cumulative GEX',
+                    line=dict(color='purple', width=3),
+                    hovertemplate='Strike: $%{x}<br>Cumulative: %{y:.1f}M<extra></extra>'
+                ), row=2, col=1
+            )
+            
+            fig_detail.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
+            
+            fig_detail.update_layout(
+                height=700,
+                showlegend=True,
+                title=f"{detail_symbol.upper()} Detailed GEX Analysis - {datetime.now().strftime('%H:%M:%S')}",
+                hovermode='x unified'
+            )
+            
+            fig_detail.update_xaxes(title_text="Strike Price ($)", row=2, col=1)
+            fig_detail.update_yaxes(title_text="GEX (Millions)", row=1, col=1)
+            fig_detail.update_yaxes(title_text="Cumulative GEX (Millions)", row=2, col=1)
+            
+            st.plotly_chart(fig_detail, use_container_width=True)
+            
+            # Walls analysis
+            wall_col1, wall_col2 = st.columns(2)
+            
+            with wall_col1:
+                st.markdown("**🟢 Call Walls (Resistance)**")
+                for i, (_, wall) in enumerate(gex_profile['call_walls'].head(5).iterrows(), 1):
+                    distance = ((wall['strike'] - current_price) / current_price) * 100
+                    st.markdown(f"**{i}.** ${wall['strike']:.2f} (+{distance:.1f}%) - {wall['call_gex']/1e6:.1f}M GEX - {wall['call_oi']:,} OI")
+            
+            with wall_col2:
+                st.markdown("**🔴 Put Walls (Support)**")
+                for i, (_, wall) in enumerate(gex_profile['put_walls'].head(5).iterrows(), 1):
+                    distance = ((wall['strike'] - current_price) / current_price) * 100
+                    st.markdown(f"**{i}.** ${wall['strike']:.2f} ({distance:.1f}%) - {abs(wall['put_gex'])/1e6:.1f}M GEX - {wall['put_oi']:,} OI")
+            
+            # Raw data table
+            if st.checkbox("Show Raw Strike Data"):
+                display_strikes = strike_data.copy()
+                display_strikes['call_gex_m'] = (display_strikes['call_gex'] / 1e6).round(2)
+                display_strikes['put_gex_m'] = (display_strikes['put_gex'] / 1e6).round(2)
+                display_strikes['net_gex_m'] = (display_strikes['net_gex'] / 1e6).round(2)
+                
+                st.dataframe(
+                    display_strikes[['strike', 'call_gex_m', 'put_gex_m', 'net_gex_m', 'call_oi', 'put_oi']],
+                    use_container_width=True
+                )
+        
+        else:
+            st.error(f"❌ Unable to build detailed profile for {detail_symbol.upper()}")
+            st.info("This could be due to limited options data or low activity")
+
+# Export functionality
+if 'scan_results' in locals() and len(scan_results) > 0:
+    st.markdown("---")
+    st.markdown("### 📥 Export Results")
+    
+    export_col1, export_col2 = st.columns(2)
+    
+    with export_col1:
+        if st.button("📊 Export Volume Data"):
+            csv = volume_data.to_csv(index=False)
+            st.download_button(
+                "Download Volume CSV",
+                csv,
+                f"options_volume_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                "text/csv"
+            )
+    
+    with export_col2:
+        if st.button("🎯 Export Signals"):
+            csv = filtered_results.to_csv(index=False) if 'filtered_results' in locals() else scan_results.to_csv(index=False)
+            st.download_button(
+                "Download Signals CSV",
+                csv,
+                f"gex_signals_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                "text/csv"
+            )
+
+# Footer with scan statistics
 st.markdown("---")
 
 footer_col1, footer_col2, footer_col3 = st.columns(3)
 
 with footer_col1:
-    st.markdown("**🔌 System Status**")
-    
-    status_info = get_system_health(connection)
-    if status_info["status"] == "online":
-        st.markdown("🟢 **Databricks:** Connected")
-        st.markdown(f"🟢 **Data Age:** {status_info.get('hours_old', 0):.1f} hours")
-    else:
-        st.markdown("🔴 **Databricks:** Issues detected")
-    
-    st.markdown(f"🟢 **Dashboard:** Online")
+    st.markdown("**🔍 Scan Statistics**")
+    if 'volume_data' in locals():
+        st.markdown(f"• Symbols Scanned: {len(volume_data)}")
+        st.markdown(f"• With Options Data: {len(volume_data)}")
+        st.markdown(f"• Meeting Volume Threshold: {len(volume_data[volume_data['total_volume'] >= volume_threshold])}")
 
 with footer_col2:
-    st.markdown("**📊 Data Summary**")
-    
-    if gex_profile_data is not None:
-        st.markdown(f"**GEX Strikes:** {len(gex_profile_data)}")
-        total_oi = gex_profile_data['call_oi'].sum() + gex_profile_data['put_oi'].sum()
-        st.markdown(f"**Total OI:** {total_oi:,}")
-    
-    if signals_data is not None:
-        st.markdown(f"**Active Signals:** {len(signals_data)}")
-    
-    st.markdown(f"**Symbol:** {symbol}")
+    st.markdown("**📊 Signal Summary**")
+    if 'scan_results' in locals() and len(scan_results) > 0:
+        st.markdown(f"• Total Signals: {len(scan_results)}")
+        st.markdown(f"• High Confidence: {len(scan_results[scan_results['confidence'] >= 75])}")
+        st.markdown(f"• Meeting Filters: {len(filtered_results) if 'filtered_results' in locals() else 0}")
 
 with footer_col3:
-    st.markdown("**🛠️ Tools**")
-    
-    # Data export
-    if st.button("📥 Export Data"):
-        if gex_profile_data is not None:
-            csv = gex_profile_data.to_csv(index=False)
-            st.download_button(
-                "Download GEX CSV",
-                csv,
-                f"{symbol}_gex_{date.today()}.csv",
-                "text/csv"
-            )
-    
-    # Quick actions
-    if st.button("🔄 Force Refresh"):
-        st.cache_data.clear()
-        st.success("Cache cleared!")
-    
-    if st.button("📊 System Info"):
-        st.info(f"""
-        **Version:** 2.0 Production
-        **Environment:** {os.getenv('ENVIRONMENT', 'Production')}
-        **Last Deploy:** {os.getenv('DEPLOY_DATE', 'Unknown')}
-        """)
+    st.markdown("**⏰ Scan Info**")
+    st.markdown(f"• Scan Time: {datetime.now().strftime('%H:%M:%S')}")
+    st.markdown(f"• Data Source: Yahoo Finance")
+    st.markdown(f"• Update Frequency: On-demand")
 
-# Auto-refresh functionality
-if auto_refresh:
-    # Display countdown
-    placeholder = st.empty()
-    for seconds in range(300, 0, -1):  # 5-minute countdown
-        placeholder.markdown(f"🔄 Auto-refresh in {seconds//60}:{seconds%60:02d}")
-        time.sleep(1)
-    
-    placeholder.empty()
+# Auto-refresh
+if auto_scan:
+    time.sleep(1800)  # 30 minutes
     st.rerun()
 
-# Risk disclaimer
+# Disclaimer
 st.markdown("""
 ---
-**⚠️ IMPORTANT DISCLAIMER:** This dashboard is for educational and analytical purposes only. 
-Options trading involves substantial risk of loss and is not suitable for all investors. 
-The information provided should not be considered as investment advice. 
-Always conduct your own research and consider consulting with a qualified financial advisor 
-before making any trading decisions. Past performance does not guarantee future results.
+**⚠️ IMPORTANT DISCLAIMER:** This scanner analyzes real market data for educational purposes only. 
+The signals generated are based on mathematical models and should not be considered investment advice. 
+Options trading involves substantial risk and requires proper education and risk management. 
+Always conduct your own research and consult with qualified professionals before making trading decisions.
 """)
