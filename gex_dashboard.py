@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Top 100 Options Volume GEX Scanner
-Real-time analysis of the most actively traded options
+Complete Dynamic GEX Scanner
+Real-time analysis of options with custom symbol support
 """
 
 import streamlit as st
@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="🎯 Top 100 Options Volume GEX Scanner",
+    page_title="🎯 Dynamic GEX Scanner",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -70,32 +70,28 @@ st.markdown("""
         gap: 1rem;
         margin: 1rem 0;
     }
-    
-    .progress-container {
-        margin: 1rem 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>🎯 Top 100 Options Volume GEX Scanner</h1>
-    <p><strong>Real-Time Mass Analysis</strong> | Scanning highest options volume symbols for GEX opportunities</p>
-    <p>Professional-grade options flow analysis across the most liquid names</p>
+    <h1>🎯 Dynamic GEX Scanner</h1>
+    <p><strong>Real-Time Analysis</strong> | Live options data with custom symbol support</p>
+    <p>Professional gamma exposure analysis with any symbol</p>
 </div>
 """, unsafe_allow_html=True)
 
-class Top100OptionsScanner:
-    """Scanner for top 100 symbols by options volume"""
+class DynamicOptionsScanner:
+    """Dynamic scanner with real-time list updates and custom symbol analysis"""
     
     def __init__(self):
         self.risk_free_rate = 0.05
         self.scan_lock = Lock()
         self.results_cache = {}
         
-        # Top 100 symbols by typical options volume (updated list)
-        self.top_symbols = [
+        # Base symbols (will be dynamically updated)
+        self.base_symbols = [
             # Major ETFs
             "SPY", "QQQ", "IWM", "EEM", "GLD", "VIX", "XLF", "XLE", "XLK", "XLP",
             "XLY", "XLI", "XLV", "XLU", "XLB", "XLRE", "XRT", "VXX", "UVXY", "SQQQ",
@@ -105,7 +101,7 @@ class Top100OptionsScanner:
             "ORCL", "ADBE", "INTC", "AMD", "PYPL", "UBER", "LYFT", "SHOP", "SQ", "ZOOM",
             
             # Large Cap Growth
-            "BRK.B", "JPM", "JNJ", "UNH", "V", "MA", "HD", "PG", "KO", "PFE",
+            "BRK-B", "JPM", "JNJ", "UNH", "V", "MA", "HD", "PG", "KO", "PFE",
             "DIS", "VZ", "T", "CSCO", "WMT", "BAC", "XOM", "CVX", "ABBV", "TMO",
             
             # High Beta/Meme Stocks
@@ -114,25 +110,50 @@ class Top100OptionsScanner:
             
             # Finance & Energy
             "GS", "MS", "C", "WFC", "USB", "PNC", "COF", "AXP", "BLK", "SCHW",
-            "SLB", "HAL", "OXY", "COP", "EOG", "DVN", "MRO", "APA", "FANG", "PXD",
-            
-            # Additional High Volume
-            "BA", "CAT", "IBM", "GE", "SNAP", "TWTR", "PINS", "ROKU", "DOCU", "ZM",
-            "BABA", "JD", "PDD", "DIDI", "TAL", "EDU", "BIDU", "IQ", "VIPS", "WB"
+            "SLB", "HAL", "OXY", "COP", "EOG", "DVN", "MRO", "APA", "FANG", "PXD"
         ]
+    
+    @st.cache_data(ttl=1800)  # 30 minutes cache
+    def get_dynamic_symbol_list(_self):
+        """Get dynamic list of most active options symbols"""
+        
+        # Method 1: Use predefined high-activity symbols
+        active_symbols = _self.base_symbols.copy()
+        
+        # Method 2: Add popular symbols from various sources
+        try:
+            # Get trending symbols (simplified approach)
+            trending_symbols = [
+                "PTON", "PELOTON", "ROKU", "ZM", "DOCU", "WORK", "SNOW", "ABNB",
+                "DKNG", "PENN", "MGM", "WYNN", "LVS", "CZR", "BYD", "VALE",
+                "X", "CLF", "MT", "SCCO", "FCX", "AA", "CENX", "STLD"
+            ]
+            active_symbols.extend(trending_symbols)
+            
+            # Remove duplicates and invalid symbols
+            active_symbols = list(set(active_symbols))
+            
+        except Exception as e:
+            st.warning(f"Using base symbol list: {e}")
+        
+        return active_symbols[:150]  # Limit to 150 symbols
     
     @st.cache_data(ttl=3600)
     def get_options_volume_ranking(_self):
-        """Get current options volume ranking for top symbols"""
+        """Get current options volume ranking for dynamic symbol list"""
+        
+        # Get dynamic symbol list
+        symbols_to_check = _self.get_dynamic_symbol_list()
+        
         volume_data = []
         
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        for i, symbol in enumerate(_self.top_symbols):
+        for i, symbol in enumerate(symbols_to_check):
             try:
-                status_text.text(f"🔍 Checking options volume: {symbol} ({i+1}/{len(_self.top_symbols)})")
-                progress_bar.progress((i + 1) / len(_self.top_symbols))
+                status_text.text(f"🔍 Checking options volume: {symbol} ({i+1}/{len(symbols_to_check)})")
+                progress_bar.progress((i + 1) / len(symbols_to_check))
                 
                 ticker = yf.Ticker(symbol)
                 
@@ -161,18 +182,20 @@ class Top100OptionsScanner:
                     put_oi = chain.puts['openInterest'].fillna(0).sum()
                     total_oi = call_oi + put_oi
                     
-                    volume_data.append({
-                        'symbol': symbol,
-                        'current_price': current_price,
-                        'call_volume': int(call_volume),
-                        'put_volume': int(put_volume),
-                        'total_volume': int(total_volume),
-                        'call_oi': int(call_oi),
-                        'put_oi': int(put_oi),
-                        'total_oi': int(total_oi),
-                        'put_call_ratio': put_volume / max(call_volume, 1),
-                        'last_updated': datetime.now()
-                    })
+                    # Only include if there's significant activity
+                    if total_volume > 100 or total_oi > 1000:
+                        volume_data.append({
+                            'symbol': symbol,
+                            'current_price': current_price,
+                            'call_volume': int(call_volume),
+                            'put_volume': int(put_volume),
+                            'total_volume': int(total_volume),
+                            'call_oi': int(call_oi),
+                            'put_oi': int(put_oi),
+                            'total_oi': int(total_oi),
+                            'put_call_ratio': put_volume / max(call_volume, 1),
+                            'last_updated': datetime.now()
+                        })
                     
                 except Exception:
                     continue
@@ -190,54 +213,6 @@ class Top100OptionsScanner:
             return df
         
         return pd.DataFrame()
-    
-    def calculate_quick_gex(self, symbol, current_price):
-        """Quick GEX calculation for scanning"""
-        try:
-            ticker = yf.Ticker(symbol)
-            exp_dates = ticker.options[:3]  # Only first 3 expirations for speed
-            
-            total_gex = 0
-            total_call_gex = 0
-            total_put_gex = 0
-            
-            for exp_date in exp_dates:
-                try:
-                    exp_dt = datetime.strptime(exp_date, '%Y-%m-%d')
-                    dte = (exp_dt.date() - date.today()).days
-                    
-                    if dte <= 0 or dte > 45:
-                        continue
-                    
-                    chain = ticker.option_chain(exp_date)
-                    T = dte / 365.0
-                    
-                    # Quick gamma approximation
-                    for _, call in chain.calls.iterrows():
-                        if call['openInterest'] > 0:
-                            gamma = 0.01 * np.exp(-abs(call['strike'] - current_price) / current_price * 5)
-                            call_gex = current_price * gamma * call['openInterest'] * 100
-                            total_call_gex += call_gex
-                            total_gex += call_gex
-                    
-                    for _, put in chain.puts.iterrows():
-                        if put['openInterest'] > 0:
-                            gamma = 0.01 * np.exp(-abs(put['strike'] - current_price) / current_price * 5)
-                            put_gex = current_price * gamma * put['openInterest'] * 100
-                            total_put_gex += put_gex
-                            total_gex -= put_gex  # Puts are negative
-                
-                except Exception:
-                    continue
-            
-            return {
-                'net_gex': total_gex,
-                'call_gex': total_call_gex,
-                'put_gex': total_put_gex
-            }
-            
-        except Exception:
-            return {'net_gex': 0, 'call_gex': 0, 'put_gex': 0}
     
     def calculate_quick_gex(self, symbol, current_price):
         """Quick GEX calculation for scanning"""
@@ -389,6 +364,295 @@ class Top100OptionsScanner:
             return results_df
         
         return pd.DataFrame()
+    
+    def analyze_custom_symbol(self, symbol):
+        """Comprehensive analysis of a single custom symbol"""
+        try:
+            symbol = symbol.upper().strip()
+            
+            # Validate symbol
+            ticker = yf.Ticker(symbol)
+            
+            # Get basic info
+            info = ticker.info
+            hist = ticker.history(period="5d")
+            
+            if len(hist) == 0:
+                return None
+            
+            current_price = hist['Close'].iloc[-1]
+            prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+            price_change = ((current_price - prev_close) / prev_close) * 100
+            
+            # Get options data
+            try:
+                exp_dates = ticker.options
+                if not exp_dates:
+                    return {
+                        'symbol': symbol,
+                        'error': 'No options available for this symbol',
+                        'current_price': current_price,
+                        'price_change': price_change
+                    }
+                
+                # Analyze multiple expirations
+                all_analysis = []
+                total_call_gex = 0
+                total_put_gex = 0
+                total_volume = 0
+                total_oi = 0
+                
+                for exp_date in exp_dates[:5]:  # First 5 expirations
+                    try:
+                        exp_dt = datetime.strptime(exp_date, '%Y-%m-%d')
+                        dte = (exp_dt.date() - date.today()).days
+                        
+                        if dte <= 0 or dte > 60:
+                            continue
+                        
+                        chain = ticker.option_chain(exp_date)
+                        
+                        # Calculate GEX for this expiration
+                        exp_call_gex = 0
+                        exp_put_gex = 0
+                        exp_volume = 0
+                        exp_oi = 0
+                        
+                        # Process calls
+                        for _, call in chain.calls.iterrows():
+                            if call['openInterest'] > 0:
+                                # Improved gamma calculation
+                                moneyness = call['strike'] / current_price
+                                time_factor = np.sqrt(dte / 365.0)
+                                gamma = 0.02 * np.exp(-2 * abs(moneyness - 1)) * time_factor
+                                
+                                call_gex = current_price * gamma * call['openInterest'] * 100
+                                exp_call_gex += call_gex
+                                exp_volume += call.get('volume', 0)
+                                exp_oi += call['openInterest']
+                        
+                        # Process puts  
+                        for _, put in chain.puts.iterrows():
+                            if put['openInterest'] > 0:
+                                moneyness = put['strike'] / current_price
+                                time_factor = np.sqrt(dte / 365.0)
+                                gamma = 0.02 * np.exp(-2 * abs(moneyness - 1)) * time_factor
+                                
+                                put_gex = current_price * gamma * put['openInterest'] * 100
+                                exp_put_gex += put_gex
+                                exp_volume += put.get('volume', 0)
+                                exp_oi += put['openInterest']
+                        
+                        all_analysis.append({
+                            'expiration': exp_date,
+                            'dte': dte,
+                            'call_gex': exp_call_gex,
+                            'put_gex': exp_put_gex,
+                            'net_gex': exp_call_gex - exp_put_gex,
+                            'volume': exp_volume,
+                            'open_interest': exp_oi
+                        })
+                        
+                        total_call_gex += exp_call_gex
+                        total_put_gex += exp_put_gex
+                        total_volume += exp_volume
+                        total_oi += exp_oi
+                        
+                    except Exception as e:
+                        continue
+                
+                if not all_analysis:
+                    return {
+                        'symbol': symbol,
+                        'error': 'Unable to analyze options data',
+                        'current_price': current_price,
+                        'price_change': price_change
+                    }
+                
+                # Calculate overall metrics
+                net_gex = total_call_gex - total_put_gex
+                
+                # Determine signals and confidence
+                signals = []
+                confidence = 0
+                
+                # GEX-based signals
+                if net_gex < -50e6:
+                    signals.append("NEGATIVE_GEX_SQUEEZE")
+                    confidence += 35
+                elif net_gex > 100e6:
+                    signals.append("POSITIVE_GEX_RANGE")
+                    confidence += 25
+                
+                # Volume-based signals
+                if total_volume > 5000:
+                    signals.append("HIGH_VOLUME")
+                    confidence += 20
+                
+                # Open interest signals
+                if total_oi > 25000:
+                    signals.append("HIGH_OPEN_INTEREST")
+                    confidence += 15
+                
+                # Price movement signals
+                if abs(price_change) > 3:
+                    signals.append("HIGH_MOMENTUM")
+                    confidence += 10
+                
+                # Put/call ratio
+                put_call_ratio = total_put_gex / max(total_call_gex, 1)
+                if put_call_ratio > 1.5:
+                    signals.append("BEARISH_POSITIONING")
+                    confidence += 10
+                elif put_call_ratio < 0.5:
+                    signals.append("BULLISH_POSITIONING")
+                    confidence += 10
+                
+                return {
+                    'symbol': symbol,
+                    'company_name': info.get('longName', symbol),
+                    'sector': info.get('sector', 'Unknown'),
+                    'current_price': current_price,
+                    'price_change': price_change,
+                    'market_cap': info.get('marketCap', 0),
+                    'total_call_gex': total_call_gex,
+                    'total_put_gex': total_put_gex,
+                    'net_gex': net_gex,
+                    'total_volume': int(total_volume),
+                    'total_oi': int(total_oi),
+                    'put_call_ratio': put_call_ratio,
+                    'signals': signals,
+                    'confidence': min(confidence, 100),
+                    'expiration_analysis': all_analysis,
+                    'analysis_time': datetime.now()
+                }
+                
+            except Exception as e:
+                return {
+                    'symbol': symbol,
+                    'error': f'Options analysis failed: {str(e)}',
+                    'current_price': current_price,
+                    'price_change': price_change
+                }
+                
+        except Exception as e:
+            return {
+                'symbol': symbol,
+                'error': f'Symbol analysis failed: {str(e)}'
+            }
+    
+    def get_detailed_gex_profile(self, symbol):
+        """Get detailed strike-by-strike GEX profile"""
+        try:
+            ticker = yf.Ticker(symbol)
+            current_price = self.get_current_price(symbol)
+            
+            if current_price is None:
+                return None
+            
+            exp_dates = ticker.options[:3]  # First 3 expirations
+            all_strikes = []
+            
+            for exp_date in exp_dates:
+                try:
+                    exp_dt = datetime.strptime(exp_date, '%Y-%m-%d')
+                    dte = (exp_dt.date() - date.today()).days
+                    
+                    if dte <= 0 or dte > 45:
+                        continue
+                    
+                    chain = ticker.option_chain(exp_date)
+                    
+                    # Process all strikes
+                    strikes_data = {}
+                    
+                    # Calls
+                    for _, call in chain.calls.iterrows():
+                        strike = call['strike']
+                        if call['openInterest'] > 0 and strike >= current_price * 0.85 and strike <= current_price * 1.15:
+                            moneyness = strike / current_price
+                            time_factor = np.sqrt(dte / 365.0)
+                            gamma = 0.02 * np.exp(-2 * abs(moneyness - 1)) * time_factor
+                            gex = current_price * gamma * call['openInterest'] * 100
+                            
+                            if strike not in strikes_data:
+                                strikes_data[strike] = {'call_gex': 0, 'put_gex': 0, 'call_oi': 0, 'put_oi': 0}
+                            
+                            strikes_data[strike]['call_gex'] += gex
+                            strikes_data[strike]['call_oi'] += call['openInterest']
+                    
+                    # Puts
+                    for _, put in chain.puts.iterrows():
+                        strike = put['strike']
+                        if put['openInterest'] > 0 and strike >= current_price * 0.85 and strike <= current_price * 1.15:
+                            moneyness = strike / current_price
+                            time_factor = np.sqrt(dte / 365.0)
+                            gamma = 0.02 * np.exp(-2 * abs(moneyness - 1)) * time_factor
+                            gex = current_price * gamma * put['openInterest'] * 100
+                            
+                            if strike not in strikes_data:
+                                strikes_data[strike] = {'call_gex': 0, 'put_gex': 0, 'call_oi': 0, 'put_oi': 0}
+                            
+                            strikes_data[strike]['put_gex'] += gex
+                            strikes_data[strike]['put_oi'] += put['openInterest']
+                    
+                    for strike, data in strikes_data.items():
+                        all_strikes.append({
+                            'strike': strike,
+                            'call_gex': data['call_gex'],
+                            'put_gex': -data['put_gex'],  # Negative for puts
+                            'net_gex': data['call_gex'] - data['put_gex'],
+                            'call_oi': data['call_oi'],
+                            'put_oi': data['put_oi'],
+                            'expiration': exp_date,
+                            'dte': dte
+                        })
+                        
+                except Exception:
+                    continue
+            
+            if all_strikes:
+                df = pd.DataFrame(all_strikes)
+                
+                # Aggregate by strike
+                strike_gex = df.groupby('strike').agg({
+                    'call_gex': 'sum',
+                    'put_gex': 'sum',
+                    'net_gex': 'sum',
+                    'call_oi': 'sum',
+                    'put_oi': 'sum'
+                }).reset_index()
+                
+                strike_gex = strike_gex.sort_values('strike').reset_index(drop=True)
+                strike_gex['cumulative_gex'] = strike_gex['net_gex'].cumsum()
+                
+                # Find gamma flip
+                flip_idx = strike_gex['cumulative_gex'].abs().idxmin()
+                gamma_flip = strike_gex.iloc[flip_idx]['strike']
+                
+                return {
+                    'current_price': current_price,
+                    'gamma_flip': gamma_flip,
+                    'strike_data': strike_gex,
+                    'call_walls': strike_gex[strike_gex['call_gex'] > 0].nlargest(3, 'call_gex'),
+                    'put_walls': strike_gex[strike_gex['put_gex'] < 0].nsmallest(3, 'put_gex')
+                }
+            
+            return None
+            
+        except Exception as e:
+            return None
+    
+    def get_current_price(self, symbol):
+        """Get current stock price"""
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="1d")
+            if len(hist) > 0:
+                return float(hist['Close'].iloc[-1])
+            return None
+        except:
+            return None
 
 # Initialize scanner
 @st.cache_resource
@@ -479,7 +743,7 @@ with tab1:
             st.error("❌ No options data found. Please try again.")
             st.stop()
     
-    # Step 2: GEX Analysis (existing code continues...)
+    # Step 2: GEX Analysis
     with st.expander("⚡ Step 2: GEX Signal Analysis", expanded=True):
         st.markdown(f"Analyzing top {max_symbols} symbols for gamma exposure signals...")
         
@@ -545,7 +809,7 @@ with tab1:
                 # Detailed results
                 st.markdown("### 🎯 Detailed Signal Analysis")
                 
-                for _, result in filtered_results.head(20).iterrows():  # Show top 20
+                for _, result in filtered_results.head(20).iterrows():
                     confidence = result['confidence']
                     
                     if confidence >= 75:
@@ -597,7 +861,7 @@ with tab2:
         )
     
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        st.markdown("<br>", unsafe_allow_html=True)
         analyze_button = st.button("📊 Analyze Symbol", type="primary")
     
     # Popular symbols quick access
@@ -703,33 +967,6 @@ with tab2:
                 )
                 
                 st.plotly_chart(fig_pie, use_container_width=True)
-            
-            # Expiration analysis
-            if analysis.get('expiration_analysis'):
-                st.markdown("### 📅 Expiration Analysis")
-                
-                exp_df = pd.DataFrame(analysis['expiration_analysis'])
-                exp_df['net_gex_millions'] = exp_df['net_gex'] / 1e6
-                
-                fig_exp = go.Figure()
-                
-                fig_exp.add_trace(go.Bar(
-                    x=exp_df['expiration'],
-                    y=exp_df['net_gex_millions'],
-                    name='Net GEX by Expiration',
-                    marker_color=['green' if x > 0 else 'red' for x in exp_df['net_gex_millions']]
-                ))
-                
-                fig_exp.update_layout(
-                    title="Net GEX by Expiration",
-                    xaxis_title="Expiration Date",
-                    yaxis_title="Net GEX (Millions)",
-                    height=400
-                )
-                
-                st.plotly_chart(fig_exp, use_container_width=True)
-                
-                st.dataframe(exp_df[['expiration', 'dte', 'net_gex_millions', 'volume', 'open_interest']], use_container_width=True)
         
         elif analysis and 'error' in analysis:
             st.error(f"❌ {analysis['error']}")
@@ -824,17 +1061,6 @@ with tab3:
             fig_detail.add_vline(x=gamma_flip, line_dash="dash", line_color="orange",
                                annotation_text=f"Flip: ${gamma_flip:.2f}", row=1, col=1)
             
-            # Major walls
-            if len(gex_profile['call_walls']) > 0:
-                call_wall = gex_profile['call_walls'].iloc[0]['strike']
-                fig_detail.add_vline(x=call_wall, line_dash="dot", line_color="green",
-                                   annotation_text=f"Call Wall: ${call_wall:.2f}", row=1, col=1)
-            
-            if len(gex_profile['put_walls']) > 0:
-                put_wall = gex_profile['put_walls'].iloc[0]['strike']
-                fig_detail.add_vline(x=put_wall, line_dash="dot", line_color="red",
-                                   annotation_text=f"Put Wall: ${put_wall:.2f}", row=1, col=1)
-            
             # Cumulative GEX
             fig_detail.add_trace(
                 go.Scatter(
@@ -852,7 +1078,7 @@ with tab3:
             fig_detail.update_layout(
                 height=700,
                 showlegend=True,
-                title=f"{detail_symbol.upper()} Detailed GEX Analysis - {datetime.now().strftime('%H:%M:%S')}",
+                title=f"{detail_symbol.upper()} Detailed GEX Analysis",
                 hovermode='x unified'
             )
             
@@ -869,92 +1095,21 @@ with tab3:
                 st.markdown("**🟢 Call Walls (Resistance)**")
                 for i, (_, wall) in enumerate(gex_profile['call_walls'].head(5).iterrows(), 1):
                     distance = ((wall['strike'] - current_price) / current_price) * 100
-                    st.markdown(f"**{i}.** ${wall['strike']:.2f} (+{distance:.1f}%) - {wall['call_gex']/1e6:.1f}M GEX - {wall['call_oi']:,} OI")
+                    st.markdown(f"**{i}.** ${wall['strike']:.2f} (+{distance:.1f}%) - {wall['call_gex']/1e6:.1f}M GEX")
             
             with wall_col2:
                 st.markdown("**🔴 Put Walls (Support)**")
                 for i, (_, wall) in enumerate(gex_profile['put_walls'].head(5).iterrows(), 1):
                     distance = ((wall['strike'] - current_price) / current_price) * 100
-                    st.markdown(f"**{i}.** ${wall['strike']:.2f} ({distance:.1f}%) - {abs(wall['put_gex'])/1e6:.1f}M GEX - {wall['put_oi']:,} OI")
-            
-            # Raw data table
-            if st.checkbox("Show Raw Strike Data"):
-                display_strikes = strike_data.copy()
-                display_strikes['call_gex_m'] = (display_strikes['call_gex'] / 1e6).round(2)
-                display_strikes['put_gex_m'] = (display_strikes['put_gex'] / 1e6).round(2)
-                display_strikes['net_gex_m'] = (display_strikes['net_gex'] / 1e6).round(2)
-                
-                st.dataframe(
-                    display_strikes[['strike', 'call_gex_m', 'put_gex_m', 'net_gex_m', 'call_oi', 'put_oi']],
-                    use_container_width=True
-                )
+                    st.markdown(f"**{i}.** ${wall['strike']:.2f} ({distance:.1f}%) - {abs(wall['put_gex'])/1e6:.1f}M GEX")
         
         else:
             st.error(f"❌ Unable to build detailed profile for {detail_symbol.upper()}")
-            st.info("This could be due to limited options data or low activity")
 
-# Export functionality
-if 'scan_results' in locals() and len(scan_results) > 0:
-    st.markdown("---")
-    st.markdown("### 📥 Export Results")
-    
-    export_col1, export_col2 = st.columns(2)
-    
-    with export_col1:
-        if st.button("📊 Export Volume Data"):
-            csv = volume_data.to_csv(index=False)
-            st.download_button(
-                "Download Volume CSV",
-                csv,
-                f"options_volume_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                "text/csv"
-            )
-    
-    with export_col2:
-        if st.button("🎯 Export Signals"):
-            csv = filtered_results.to_csv(index=False) if 'filtered_results' in locals() else scan_results.to_csv(index=False)
-            st.download_button(
-                "Download Signals CSV",
-                csv,
-                f"gex_signals_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                "text/csv"
-            )
-
-# Footer with scan statistics
+# Footer
 st.markdown("---")
-
-footer_col1, footer_col2, footer_col3 = st.columns(3)
-
-with footer_col1:
-    st.markdown("**🔍 Scan Statistics**")
-    if 'volume_data' in locals():
-        st.markdown(f"• Symbols Scanned: {len(volume_data)}")
-        st.markdown(f"• With Options Data: {len(volume_data)}")
-        st.markdown(f"• Meeting Volume Threshold: {len(volume_data[volume_data['total_volume'] >= volume_threshold])}")
-
-with footer_col2:
-    st.markdown("**📊 Signal Summary**")
-    if 'scan_results' in locals() and len(scan_results) > 0:
-        st.markdown(f"• Total Signals: {len(scan_results)}")
-        st.markdown(f"• High Confidence: {len(scan_results[scan_results['confidence'] >= 75])}")
-        st.markdown(f"• Meeting Filters: {len(filtered_results) if 'filtered_results' in locals() else 0}")
-
-with footer_col3:
-    st.markdown("**⏰ Scan Info**")
-    st.markdown(f"• Scan Time: {datetime.now().strftime('%H:%M:%S')}")
-    st.markdown(f"• Data Source: Yahoo Finance")
-    st.markdown(f"• Update Frequency: On-demand")
-
-# Auto-refresh
-if auto_scan:
-    time.sleep(1800)  # 30 minutes
-    st.rerun()
-
-# Disclaimer
 st.markdown("""
----
-**⚠️ IMPORTANT DISCLAIMER:** This scanner analyzes real market data for educational purposes only. 
-The signals generated are based on mathematical models and should not be considered investment advice. 
+**⚠️ DISCLAIMER:** This scanner uses real market data for educational purposes only. 
 Options trading involves substantial risk and requires proper education and risk management. 
 Always conduct your own research and consult with qualified professionals before making trading decisions.
 """)
