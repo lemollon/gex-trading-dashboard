@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Complete Dynamic GEX Scanner
-Real-time analysis of options with custom symbol support
+Complete Dynamic GEX Scanner with Options Strategies
+Real-time analysis with improved styling and readability
 """
 
 import streamlit as st
@@ -27,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Professional styling
+# Fixed professional styling with better readability
 st.markdown("""
 <style>
     .main-header {
@@ -43,25 +43,53 @@ st.markdown("""
     .scanner-card {
         background: white;
         border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
+        padding: 1.5rem;
+        margin: 1rem 0;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         border-left: 4px solid #667eea;
+        color: #333;
     }
     
     .high-signal {
         border-left: 4px solid #28a745 !important;
-        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        background: linear-gradient(135deg, #f8fff9, #e8f5e8) !important;
+        color: #155724 !important;
     }
     
     .medium-signal {
-        border-left: 4px solid #ffc107 !important;
-        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        border-left: 4px solid #fd7e14 !important;
+        background: linear-gradient(135deg, #fff8f0, #fef3e8) !important;
+        color: #8a4a00 !important;
     }
     
     .low-signal {
         border-left: 4px solid #dc3545 !important;
-        background: linear-gradient(135deg, #f8d7da, #fab1a0);
+        background: linear-gradient(135deg, #fff5f5, #ffeaea) !important;
+        color: #721c24 !important;
+    }
+    
+    .strategy-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+    
+    .strategy-high {
+        border-left: 5px solid #28a745;
+        background: linear-gradient(135deg, #f8fff9, #ffffff);
+    }
+    
+    .strategy-medium {
+        border-left: 5px solid #fd7e14;
+        background: linear-gradient(135deg, #fff8f0, #ffffff);
+    }
+    
+    .strategy-low {
+        border-left: 5px solid #dc3545;
+        background: linear-gradient(135deg, #fff5f5, #ffffff);
     }
     
     .metric-grid {
@@ -70,6 +98,47 @@ st.markdown("""
         gap: 1rem;
         margin: 1rem 0;
     }
+    
+    .confidence-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9rem;
+        margin-left: 1rem;
+    }
+    
+    .conf-high {
+        background: #28a745;
+        color: white;
+    }
+    
+    .conf-medium {
+        background: #fd7e14;
+        color: white;
+    }
+    
+    .conf-low {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .strategy-details {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border: 1px solid #dee2e6;
+    }
+    
+    .risk-box {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        color: #8a4a00;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,8 +146,8 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1>🎯 Dynamic GEX Scanner</h1>
-    <p><strong>Real-Time Analysis</strong> | Live options data with custom symbol support</p>
-    <p>Professional gamma exposure analysis with any symbol</p>
+    <p><strong>Real-Time Analysis</strong> | Live options data with advanced strategies</p>
+    <p>Professional gamma exposure analysis with institutional-grade recommendations</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -643,6 +712,459 @@ class DynamicOptionsScanner:
         except Exception as e:
             return None
     
+    def analyze_options_strategies(self, symbol, gex_data=None):
+        """Advanced options strategy analysis with price targets and confidence"""
+        try:
+            if gex_data is None:
+                # Get comprehensive GEX analysis
+                gex_profile = self.get_detailed_gex_profile(symbol)
+                if not gex_profile:
+                    return None
+                
+                current_price = gex_profile['current_price']
+                gamma_flip = gex_profile['gamma_flip']
+                call_walls = gex_profile['call_walls']
+                put_walls = gex_profile['put_walls']
+                strike_data = gex_profile['strike_data']
+            else:
+                current_price = gex_data['current_price']
+                gamma_flip = gex_data.get('gamma_flip', current_price)
+                call_walls = gex_data.get('call_walls', pd.DataFrame())
+                put_walls = gex_data.get('put_walls', pd.DataFrame())
+                strike_data = gex_data.get('strike_data', pd.DataFrame())
+            
+            # Calculate key metrics
+            net_gex = strike_data['net_gex'].sum() if len(strike_data) > 0 else 0
+            distance_to_flip = ((current_price - gamma_flip) / current_price) * 100
+            
+            strategies = []
+            
+            # 1. LONG CALL ANALYSIS
+            long_call_analysis = self._analyze_long_calls(
+                current_price, gamma_flip, net_gex, distance_to_flip, call_walls, strike_data
+            )
+            if long_call_analysis:
+                strategies.append(long_call_analysis)
+            
+            # 2. LONG PUT ANALYSIS
+            long_put_analysis = self._analyze_long_puts(
+                current_price, gamma_flip, net_gex, distance_to_flip, put_walls, strike_data
+            )
+            if long_put_analysis:
+                strategies.append(long_put_analysis)
+            
+            # 3. SELL CALL ANALYSIS
+            sell_call_analysis = self._analyze_sell_calls(
+                current_price, gamma_flip, net_gex, call_walls, strike_data
+            )
+            if sell_call_analysis:
+                strategies.append(sell_call_analysis)
+            
+            # 4. SELL PUT ANALYSIS
+            sell_put_analysis = self._analyze_sell_puts(
+                current_price, gamma_flip, net_gex, put_walls, strike_data
+            )
+            if sell_put_analysis:
+                strategies.append(sell_put_analysis)
+            
+            # 5. IRON CONDOR ANALYSIS
+            iron_condor_analysis = self._analyze_iron_condors(
+                current_price, gamma_flip, net_gex, call_walls, put_walls, strike_data
+            )
+            if iron_condor_analysis:
+                strategies.append(iron_condor_analysis)
+            
+            return {
+                'symbol': symbol,
+                'current_price': current_price,
+                'gamma_flip': gamma_flip,
+                'net_gex': net_gex,
+                'distance_to_flip': distance_to_flip,
+                'strategies': sorted(strategies, key=lambda x: x['confidence'], reverse=True),
+                'analysis_time': datetime.now()
+            }
+            
+        except Exception as e:
+            return None
+    
+    def _analyze_long_calls(self, current_price, gamma_flip, net_gex, distance_to_flip, call_walls, strike_data):
+        """Analyze long call opportunities"""
+        confidence = 0
+        strategy_details = {
+            'strategy': 'LONG CALLS',
+            'strategy_type': 'directional_bullish',
+            'emoji': '🚀'
+        }
+        
+        # Conditions for long calls
+        reasons = []
+        
+        # 1. Negative GEX environment (volatility amplification)
+        if net_gex < -100e6:
+            confidence += 35
+            reasons.append(f"Negative GEX {net_gex/1e6:.0f}M creates volatility amplification")
+        
+        # 2. Price below gamma flip
+        if distance_to_flip < -0.5:
+            confidence += 25
+            reasons.append(f"Price {abs(distance_to_flip):.1f}% below gamma flip point")
+        
+        # 3. Strong put wall support
+        if len(call_walls) > 0:
+            nearest_call_wall = call_walls.iloc[0]['strike']
+            wall_distance = ((nearest_call_wall - current_price) / current_price) * 100
+            if wall_distance > 2:  # At least 2% upside to wall
+                confidence += 20
+                reasons.append(f"Call wall resistance at ${nearest_call_wall:.2f} (+{wall_distance:.1f}%)")
+        
+        # 4. Low gamma environment around current price
+        if len(strike_data) > 0:
+            atm_strikes = strike_data[
+                (strike_data['strike'] >= current_price * 0.98) & 
+                (strike_data['strike'] <= current_price * 1.02)
+            ]
+            if len(atm_strikes) > 0:
+                avg_gamma = atm_strikes['net_gex'].mean()
+                if avg_gamma < 50e6:  # Low gamma at the money
+                    confidence += 15
+                    reasons.append("Low gamma at-the-money reduces dealer hedging")
+        
+        if confidence >= 50:
+            # Determine optimal strikes and price targets
+            atm_strike = round(current_price / 5) * 5  # Round to nearest $5
+            target_strikes = [atm_strike, atm_strike + 5]
+            
+            # Price targets
+            if len(call_walls) > 0:
+                primary_target = call_walls.iloc[0]['strike']
+                secondary_target = call_walls.iloc[1]['strike'] if len(call_walls) > 1 else primary_target * 1.05
+            else:
+                primary_target = current_price * 1.05
+                secondary_target = current_price * 1.08
+            
+            # Expected move calculation
+            expected_move = abs(distance_to_flip) * 0.6 if distance_to_flip < 0 else 3.0
+            
+            strategy_details.update({
+                'confidence': min(confidence, 95),
+                'recommended_strikes': target_strikes,
+                'optimal_dte': '2-5 DTE' if confidence > 75 else '5-10 DTE',
+                'primary_target': primary_target,
+                'secondary_target': secondary_target,
+                'expected_move': expected_move,
+                'max_risk': '100% (premium paid)',
+                'expected_return': f"{int(expected_move * 8)}-{int(expected_move * 15)}%",
+                'stop_loss': current_price * 0.97,
+                'reasons': reasons,
+                'position_size': '2-3% of portfolio (high risk)',
+                'time_horizon': '1-5 days',
+                'volatility_bet': 'Long volatility + directional'
+            })
+            
+            return strategy_details
+        
+        return None
+    
+    def _analyze_long_puts(self, current_price, gamma_flip, net_gex, distance_to_flip, put_walls, strike_data):
+        """Analyze long put opportunities"""
+        confidence = 0
+        strategy_details = {
+            'strategy': 'LONG PUTS',
+            'strategy_type': 'directional_bearish',
+            'emoji': '📉'
+        }
+        
+        reasons = []
+        
+        # 1. High positive GEX near flip point (breakdown potential)
+        if net_gex > 200e6 and abs(distance_to_flip) < 0.5:
+            confidence += 40
+            reasons.append(f"High positive GEX {net_gex/1e6:.0f}M near flip point - breakdown setup")
+        
+        # 2. Price rejection from call wall
+        if len(put_walls) > 0:
+            nearest_put_wall = put_walls.iloc[0]['strike']
+            wall_distance = ((current_price - nearest_put_wall) / current_price) * 100
+            if wall_distance > 1:  # At least 1% downside to support
+                confidence += 25
+                reasons.append(f"Put wall support at ${nearest_put_wall:.2f} (-{wall_distance:.1f}%)")
+        
+        # 3. High gamma concentration above (dealer resistance)
+        if len(strike_data) > 0:
+            above_strikes = strike_data[strike_data['strike'] > current_price * 1.02]
+            if len(above_strikes) > 0:
+                call_gex_above = above_strikes['call_gex'].sum()
+                if call_gex_above > 200e6:
+                    confidence += 20
+                    reasons.append(f"Strong call gamma above: {call_gex_above/1e6:.0f}M")
+        
+        # 4. Distance from gamma flip suggests vulnerability
+        if distance_to_flip > 0.3:
+            confidence += 15
+            reasons.append(f"Price {distance_to_flip:.1f}% above flip - vulnerable to breakdown")
+        
+        if confidence >= 50:
+            # Determine optimal strikes and targets
+            atm_strike = round(current_price / 5) * 5
+            target_strikes = [atm_strike, atm_strike - 5]
+            
+            # Price targets
+            if len(put_walls) > 0:
+                primary_target = put_walls.iloc[0]['strike']
+                secondary_target = put_walls.iloc[1]['strike'] if len(put_walls) > 1 else primary_target * 0.95
+            else:
+                primary_target = current_price * 0.95
+                secondary_target = current_price * 0.92
+            
+            expected_move = max(abs(distance_to_flip) * 0.8, 2.5)
+            
+            strategy_details.update({
+                'confidence': min(confidence, 95),
+                'recommended_strikes': target_strikes,
+                'optimal_dte': '3-7 DTE' if confidence > 75 else '7-14 DTE',
+                'primary_target': primary_target,
+                'secondary_target': secondary_target,
+                'expected_move': expected_move,
+                'max_risk': '100% (premium paid)',
+                'expected_return': f"{int(expected_move * 6)}-{int(expected_move * 12)}%",
+                'stop_loss': current_price * 1.03,
+                'reasons': reasons,
+                'position_size': '2-3% of portfolio',
+                'time_horizon': '2-7 days',
+                'volatility_bet': 'Long volatility + directional'
+            })
+            
+            return strategy_details
+        
+        return None
+    
+    def _analyze_sell_calls(self, current_price, gamma_flip, net_gex, call_walls, strike_data):
+        """Analyze call selling opportunities"""
+        confidence = 0
+        strategy_details = {
+            'strategy': 'SELL CALLS',
+            'strategy_type': 'premium_collection',
+            'emoji': '💰'
+        }
+        
+        reasons = []
+        
+        # 1. High positive GEX (volatility suppression)
+        if net_gex > 300e6:
+            confidence += 30
+            reasons.append(f"High positive GEX {net_gex/1e6:.0f}M suppresses volatility")
+        
+        # 2. Strong call wall resistance
+        if len(call_walls) > 0:
+            strongest_wall = call_walls.iloc[0]
+            wall_distance = ((strongest_wall['strike'] - current_price) / current_price) * 100
+            wall_strength = strongest_wall['call_gex'] / 1e6
+            
+            if wall_distance < 3 and wall_strength > 100:  # Close to strong wall
+                confidence += 35
+                reasons.append(f"Strong call wall at ${strongest_wall['strike']:.2f} ({wall_strength:.0f}M GEX)")
+            elif wall_distance < 5:
+                confidence += 20
+                reasons.append(f"Call wall resistance at ${strongest_wall['strike']:.2f}")
+        
+        # 3. Price between flip and call wall (optimal zone)
+        if len(call_walls) > 0:
+            call_wall = call_walls.iloc[0]['strike']
+            if gamma_flip < current_price < call_wall:
+                confidence += 25
+                reasons.append("Price in optimal zone between flip and call wall")
+        
+        if confidence >= 50:
+            # Determine optimal strikes
+            if len(call_walls) > 0:
+                target_strike = call_walls.iloc[0]['strike']
+                buffer_strike = target_strike + (target_strike - current_price) * 0.5
+            else:
+                target_strike = current_price * 1.03
+                buffer_strike = current_price * 1.05
+            
+            strategy_details.update({
+                'confidence': min(confidence, 90),
+                'recommended_strikes': [target_strike, buffer_strike],
+                'optimal_dte': '7-21 DTE',
+                'primary_target': '50% profit',
+                'secondary_target': '25% profit',
+                'expected_move': 'Range-bound',
+                'max_risk': f"${target_strike - current_price:.2f} per share",
+                'expected_return': '15-35% on margin',
+                'stop_loss': f"Close if price > ${target_strike * 1.02:.2f}",
+                'reasons': reasons,
+                'position_size': '5-10% of portfolio',
+                'time_horizon': '1-3 weeks',
+                'volatility_bet': 'Short volatility'
+            })
+            
+            return strategy_details
+        
+        return None
+    
+    def _analyze_sell_puts(self, current_price, gamma_flip, net_gex, put_walls, strike_data):
+        """Analyze put selling opportunities"""
+        confidence = 0
+        strategy_details = {
+            'strategy': 'SELL PUTS',
+            'strategy_type': 'premium_collection',
+            'emoji': '🛡️'
+        }
+        
+        reasons = []
+        
+        # 1. Positive GEX environment
+        if net_gex > 200e6:
+            confidence += 25
+            reasons.append(f"Positive GEX {net_gex/1e6:.0f}M provides downside support")
+        
+        # 2. Strong put wall support
+        if len(put_walls) > 0:
+            strongest_wall = put_walls.iloc[0]
+            wall_distance = ((current_price - strongest_wall['strike']) / current_price) * 100
+            wall_strength = abs(strongest_wall['put_gex']) / 1e6
+            
+            if wall_distance > 1 and wall_strength > 75:
+                confidence += 35
+                reasons.append(f"Strong put wall at ${strongest_wall['strike']:.2f} ({wall_strength:.0f}M GEX)")
+            elif wall_distance > 0.5:
+                confidence += 20
+                reasons.append(f"Put wall support at ${strongest_wall['strike']:.2f}")
+        
+        # 3. Price above gamma flip
+        if current_price > gamma_flip:
+            flip_distance = ((current_price - gamma_flip) / current_price) * 100
+            confidence += min(flip_distance * 10, 25)
+            reasons.append(f"Price {flip_distance:.1f}% above gamma flip")
+        
+        if confidence >= 50:
+            # Determine optimal strikes
+            if len(put_walls) > 0:
+                target_strike = put_walls.iloc[0]['strike']
+                safer_strike = target_strike * 0.98
+            else:
+                target_strike = current_price * 0.97
+                safer_strike = current_price * 0.95
+            
+            strategy_details.update({
+                'confidence': min(confidence, 88),
+                'recommended_strikes': [target_strike, safer_strike],
+                'optimal_dte': '14-30 DTE',
+                'primary_target': '50% profit',
+                'secondary_target': '25% profit',
+                'expected_move': 'Sideways to up',
+                'max_risk': f"Assignment at ${target_strike:.2f}",
+                'expected_return': '20-40% annualized',
+                'stop_loss': f"Close if price < ${target_strike * 0.95:.2f}",
+                'reasons': reasons,
+                'position_size': '5-15% of portfolio',
+                'time_horizon': '2-4 weeks',
+                'volatility_bet': 'Short volatility'
+            })
+            
+            return strategy_details
+        
+        return None
+    
+    def _analyze_iron_condors(self, current_price, gamma_flip, net_gex, call_walls, put_walls, strike_data):
+        """Analyze iron condor opportunities"""
+        confidence = 0
+        strategy_details = {
+            'strategy': 'IRON CONDOR',
+            'strategy_type': 'range_trading',
+            'emoji': '🦅'
+        }
+        
+        reasons = []
+        
+        # 1. High positive GEX (range-bound environment)
+        if net_gex > 500e6:
+            confidence += 30
+            reasons.append(f"Very high positive GEX {net_gex/1e6:.0f}M creates strong range")
+        elif net_gex > 200e6:
+            confidence += 20
+            reasons.append(f"Positive GEX {net_gex/1e6:.0f}M supports range trading")
+        
+        # 2. Clear call and put walls
+        if len(call_walls) > 0 and len(put_walls) > 0:
+            call_wall = call_walls.iloc[0]['strike']
+            put_wall = put_walls.iloc[0]['strike']
+            range_width = ((call_wall - put_wall) / current_price) * 100
+            
+            if range_width > 4:  # At least 4% range
+                confidence += 35
+                reasons.append(f"Clear range: ${put_wall:.2f} - ${call_wall:.2f} ({range_width:.1f}%)")
+                
+                # Check if price is centered
+                range_center = (call_wall + put_wall) / 2
+                center_distance = abs(current_price - range_center) / current_price * 100
+                if center_distance < 1:  # Within 1% of center
+                    confidence += 15
+                    reasons.append("Price well-centered in range")
+            elif range_width > 2:
+                confidence += 20
+                reasons.append(f"Moderate range: {range_width:.1f}% wide")
+        
+        # 3. Low recent volatility
+        if len(strike_data) > 0:
+            total_gamma = strike_data['net_gex'].abs().sum()
+            gamma_concentration = max(strike_data['net_gex'].abs()) / total_gamma if total_gamma > 0 else 0
+            
+            if gamma_concentration < 0.3:  # Well distributed gamma
+                confidence += 15
+                reasons.append("Well-distributed gamma supports range")
+        
+        if confidence >= 60:
+            # Determine condor strikes
+            if len(call_walls) > 0 and len(put_walls) > 0:
+                # Short strikes at the walls
+                short_call = call_walls.iloc[0]['strike']
+                short_put = put_walls.iloc[0]['strike']
+                
+                # Long strikes outside the walls
+                strike_spacing = 5 if current_price < 200 else 10  # Adjust spacing based on price
+                long_call = short_call + strike_spacing
+                long_put = short_put - strike_spacing
+                
+                # Expected range
+                expected_range = f"${short_put:.2f} - ${short_call:.2f}"
+                range_width = ((short_call - short_put) / current_price) * 100
+                
+            else:
+                # Default strikes based on current price
+                short_call = current_price * 1.03
+                short_put = current_price * 0.97
+                long_call = current_price * 1.05
+                long_put = current_price * 0.95
+                expected_range = f"±3% range"
+                range_width = 6
+            
+            strategy_details.update({
+                'confidence': min(confidence, 92),
+                'recommended_strikes': {
+                    'long_put': long_put,
+                    'short_put': short_put,
+                    'short_call': short_call,
+                    'long_call': long_call
+                },
+                'optimal_dte': '21-45 DTE',
+                'primary_target': '25% profit',
+                'secondary_target': '50% profit',
+                'expected_move': expected_range,
+                'max_risk': f"${min(short_call - long_call, short_put - long_put):.2f} per spread",
+                'expected_return': f"{int(range_width * 2)}-{int(range_width * 4)}%",
+                'stop_loss': 'Close if either short strike threatened',
+                'reasons': reasons,
+                'position_size': '10-20% of portfolio',
+                'time_horizon': '3-6 weeks',
+                'volatility_bet': 'Short volatility + range-bound'
+            })
+            
+            return strategy_details
+        
+        return None
+    
     def get_current_price(self, symbol):
         """Get current stock price"""
         try:
@@ -662,7 +1184,7 @@ def get_scanner():
 scanner = get_scanner()
 
 # Main interface with tabs
-tab1, tab2, tab3 = st.tabs(["🔍 Mass Scanner", "🎯 Custom Symbol Analysis", "📊 Detailed GEX Profile"])
+tab1, tab2, tab3, tab4 = st.tabs(["🔍 Mass Scanner", "🎯 Custom Symbol Analysis", "📊 Detailed GEX Profile", "⚡ Options Strategies"])
 
 with tab1:
     # Original mass scanner functionality
@@ -1105,6 +1627,230 @@ with tab3:
         
         else:
             st.error(f"❌ Unable to build detailed profile for {detail_symbol.upper()}")
+
+with tab4:
+    # Options Strategies Analysis
+    st.markdown("## ⚡ Advanced Options Strategies Analysis")
+    st.markdown("Get specific strategy recommendations with price targets and confidence levels")
+    
+    # Symbol input for strategy analysis
+    strat_col1, strat_col2 = st.columns([3, 1])
+    
+    with strat_col1:
+        strategy_symbol = st.text_input(
+            "🔍 Enter Symbol for Strategy Analysis",
+            placeholder="e.g., SPY, AAPL, TSLA...",
+            key="strategy_symbol_input"
+        )
+    
+    with strat_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        strategy_button = st.button("⚡ Analyze Strategies", type="primary")
+    
+    # Quick strategy symbols
+    st.markdown("**Popular Strategy Symbols:**")
+    strategy_quick = ["SPY", "QQQ", "AAPL", "TSLA", "NVDA", "AMZN", "MSFT", "GOOGL"]
+    
+    strat_quick_cols = st.columns(4)
+    for i, sym in enumerate(strategy_quick):
+        with strat_quick_cols[i % 4]:
+            if st.button(sym, key=f"strat_quick_{sym}"):
+                strategy_symbol = sym
+                strategy_button = True
+    
+    if (strategy_button or strategy_symbol) and strategy_symbol:
+        with st.spinner(f"🔄 Analyzing options strategies for {strategy_symbol.upper()}..."):
+            strategy_analysis = scanner.analyze_options_strategies(strategy_symbol)
+        
+        if strategy_analysis and strategy_analysis.get('strategies'):
+            st.success(f"✅ Strategy analysis complete for {strategy_analysis['symbol']}")
+            
+            # Market context header
+            st.markdown(f"""
+            ### 📊 Market Context for {strategy_analysis['symbol']}
+            **Current Price:** ${strategy_analysis['current_price']:.2f} | 
+            **Gamma Flip:** ${strategy_analysis['gamma_flip']:.2f} | 
+            **Net GEX:** {strategy_analysis['net_gex']/1e6:.0f}M | 
+            **Distance to Flip:** {strategy_analysis['distance_to_flip']:.2f}%
+            """)
+            
+            # Strategy cards with improved styling
+            strategies = strategy_analysis['strategies']
+            
+            for i, strategy in enumerate(strategies):
+                confidence = strategy['confidence']
+                
+                # Determine card styling based on confidence
+                if confidence >= 75:
+                    strategy_class = "strategy-card strategy-high"
+                    conf_class = "conf-high"
+                    conf_text = "HIGH"
+                elif confidence >= 60:
+                    strategy_class = "strategy-card strategy-medium"
+                    conf_class = "conf-medium" 
+                    conf_text = "MEDIUM"
+                else:
+                    strategy_class = "strategy-card strategy-low"
+                    conf_class = "conf-low"
+                    conf_text = "LOWER"
+                
+                st.markdown(f"""
+                <div class="{strategy_class}">
+                    <h2>{strategy['emoji']} {strategy['strategy']} 
+                    <span class="confidence-badge {conf_class}">{confidence:.0f}% {conf_text} CONFIDENCE</span>
+                    </h2>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Strategy details in organized layout
+                detail_col1, detail_col2, detail_col3 = st.columns(3)
+                
+                with detail_col1:
+                    st.markdown("""
+                    <div class="strategy-details">
+                        <h4>📋 Strategy Details</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown(f"**• Type:** {strategy.get('strategy_type', 'N/A')}")
+                    st.markdown(f"**• Optimal DTE:** {strategy.get('optimal_dte', 'N/A')}")
+                    st.markdown(f"**• Position Size:** {strategy.get('position_size', 'N/A')}")
+                    st.markdown(f"**• Time Horizon:** {strategy.get('time_horizon', 'N/A')}")
+                    st.markdown(f"**• Volatility Bet:** {strategy.get('volatility_bet', 'N/A')}")
+                
+                with detail_col2:
+                    st.markdown("""
+                    <div class="strategy-details">
+                        <h4>🎯 Targets & Risk</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if isinstance(strategy.get('recommended_strikes'), list):
+                        strikes_text = ", ".join([f"${s:.2f}" for s in strategy['recommended_strikes']])
+                    elif isinstance(strategy.get('recommended_strikes'), dict):
+                        strikes_dict = strategy['recommended_strikes']
+                        strikes_text = f"Put: ${strikes_dict.get('long_put', 0):.2f}/{strikes_dict.get('short_put', 0):.2f}, Call: ${strikes_dict.get('short_call', 0):.2f}/{strikes_dict.get('long_call', 0):.2f}"
+                    else:
+                        strikes_text = "See analysis"
+                    
+                    st.markdown(f"**• Strikes:** {strikes_text}")
+                    st.markdown(f"**• Primary Target:** {strategy.get('primary_target', 'N/A')}")
+                    st.markdown(f"**• Expected Return:** {strategy.get('expected_return', 'N/A')}")
+                    st.markdown(f"**• Max Risk:** {strategy.get('max_risk', 'N/A')}")
+                    st.markdown(f"**• Stop Loss:** {strategy.get('stop_loss', 'N/A')}")
+                
+                with detail_col3:
+                    st.markdown("""
+                    <div class="strategy-details">
+                        <h4>💡 Analysis Rationale</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    for reason in strategy.get('reasons', []):
+                        st.markdown(f"• {reason}")
+                
+                # Risk management box
+                st.markdown(f"""
+                <div class="risk-box">
+                    <h4>⚠️ Risk Management Guidelines</h4>
+                    <p>• Monitor daily for changes in GEX profile and market conditions</p>
+                    <p>• Set alerts at key gamma levels and price targets</p>
+                    <p>• Consider volatility changes and time decay effects</p>
+                    <p>• Follow position sizing guidelines strictly</p>
+                    <p>• Have exit plan ready before entering position</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Advanced details in expander
+                with st.expander(f"📈 Advanced Details - {strategy['strategy']}"):
+                    
+                    adv_col1, adv_col2 = st.columns(2)
+                    
+                    with adv_col1:
+                        st.markdown("**🔢 Key Metrics:**")
+                        st.markdown(f"• **Expected Move:** {strategy.get('expected_move', 'N/A')}")
+                        st.markdown(f"• **Secondary Target:** {strategy.get('secondary_target', 'N/A')}")
+                        
+                        if strategy['strategy'] == 'IRON CONDOR':
+                            strikes = strategy.get('recommended_strikes', {})
+                            st.markdown("**Iron Condor Structure:**")
+                            st.markdown(f"• Long Put: ${strikes.get('long_put', 0):.2f}")
+                            st.markdown(f"• Short Put: ${strikes.get('short_put', 0):.2f}")
+                            st.markdown(f"• Short Call: ${strikes.get('short_call', 0):.2f}")
+                            st.markdown(f"• Long Call: ${strikes.get('long_call', 0):.2f}")
+                    
+                    with adv_col2:
+                        st.markdown("**⚠️ Specific Risk Factors:**")
+                        
+                        if strategy.get('strategy_type') == 'directional_bullish':
+                            st.markdown("• Watch for gamma flip breach to downside")
+                            st.markdown("• Monitor put wall integrity for support")
+                            st.markdown("• Consider early exit if momentum stalls")
+                        elif strategy.get('strategy_type') == 'directional_bearish':
+                            st.markdown("• Monitor call wall breakthrough")
+                            st.markdown("• Watch for put wall defense breakdown")
+                            st.markdown("• Consider profit taking at support levels")
+                        elif strategy.get('strategy_type') == 'premium_collection':
+                            st.markdown("• Close early if price approaches strike")
+                            st.markdown("• Monitor implied volatility changes")
+                            st.markdown("• Have assignment plan if applicable")
+                        elif strategy.get('strategy_type') == 'range_trading':
+                            st.markdown("• Exit immediately if range breaks")
+                            st.markdown("• Monitor both sides equally")
+                            st.markdown("• Consider adjustments if threatened")
+                
+                st.markdown("---")
+            
+            # Strategy summary
+            st.markdown("### 📊 Strategy Summary")
+            
+            summary_col1, summary_col2, summary_col3 = st.columns(3)
+            
+            with summary_col1:
+                high_conf_strategies = len([s for s in strategies if s['confidence'] >= 75])
+                st.metric("High Confidence Strategies", high_conf_strategies)
+            
+            with summary_col2:
+                avg_confidence = sum(s['confidence'] for s in strategies) / len(strategies)
+                st.metric("Average Confidence", f"{avg_confidence:.0f}%")
+            
+            with summary_col3:
+                strategy_types = list(set(s['strategy_type'] for s in strategies))
+                st.metric("Strategy Types", len(strategy_types))
+            
+            # Best strategy recommendation
+            if strategies:
+                best_strategy = strategies[0]  # Already sorted by confidence
+                
+                st.markdown("### 🏆 Top Recommendation")
+                st.markdown(f"""
+                <div class="strategy-card strategy-high">
+                    <h3>{best_strategy['emoji']} {best_strategy['strategy']} - {best_strategy['confidence']:.0f}% Confidence</h3>
+                    <p><strong>Strategy Type:</strong> {best_strategy.get('strategy_type', 'N/A')}</p>
+                    <p><strong>Optimal DTE:</strong> {best_strategy.get('optimal_dte', 'N/A')}</p>
+                    <p><strong>Expected Return:</strong> {best_strategy.get('expected_return', 'N/A')}</p>
+                    <p><strong>Position Size:</strong> {best_strategy.get('position_size', 'N/A')}</p>
+                    <p><strong>Top Reason:</strong> {best_strategy.get('reasons', ['See full analysis'])[0]}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        elif strategy_analysis:
+            st.warning("⚠️ No high-confidence strategies identified for current market conditions")
+            st.info(f"""
+            **Market Context for {strategy_analysis['symbol']}:**
+            - Current Price: ${strategy_analysis['current_price']:.2f}
+            - Gamma Flip: ${strategy_analysis['gamma_flip']:.2f}
+            - Net GEX: {strategy_analysis['net_gex']/1e6:.0f}M
+            
+            **Suggestions:**
+            - Wait for clearer GEX setup
+            - Check back after market movement
+            - Consider different time horizons
+            """)
+        
+        else:
+            st.error(f"❌ Unable to analyze strategies for {strategy_symbol.upper()}")
+            st.info("This could be due to limited options data or unusual market conditions")
 
 # Footer
 st.markdown("---")
