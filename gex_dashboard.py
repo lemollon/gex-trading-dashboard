@@ -1321,5 +1321,439 @@ with tab_analysis:
                                     position_size = capital * analyzer.strategies_config['risk_management']['max_position_size_premium']
                                 else:
                                     position_size = capital * analyzer.strategies_config['risk_management']['max_position_size_condor']
-                            
+                                    # Continue from where it was cut off (around line 1324)
                             st.markdown(f"""
+                            <div class="{card_class}">
+                                <h3>{icon} {signal['direction'].replace('_', ' ').title()} - {signal['confidence']:.0f}% Confidence</h3>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div>
+                                        <p><strong>Entry:</strong> {signal['entry']}</p>
+                                        <p><strong>Target:</strong> {signal['target']}</p>
+                                        <p><strong>Stop:</strong> {signal.get('stop', 'N/A')}</p>
+                                        <p><strong>DTE:</strong> {signal['dte']}</p>
+                                    </div>
+                                    <div>
+                                        <p><strong>Position Size:</strong> ${position_size:,.0f} ({signal['size']})</p>
+                                        <p><strong>Expected Move:</strong> {signal.get('expected_move', 1.0):.1f}%</p>
+                                        <p><strong>Time Horizon:</strong> {signal.get('time_horizon', '1-2 days')}</p>
+                                        <p><strong>Win Rate:</strong> {signal.get('win_rate', 65):.0f}%</p>
+                                    </div>
+                                </div>
+                                <p style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                                    <strong>Reasoning:</strong> {signal['reasoning']}
+                                </p>
+                                <p><strong>Market Regime:</strong> {signal['regime']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.info("No trading signals meet confidence threshold. Market conditions may be unclear.")
+                
+                # Options Flow tab
+                with analysis_tabs[2]:
+                    st.markdown("### 📈 Options Flow Analysis")
+                    
+                    mm_behavior = gex_profile['mm_behavior']
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("#### Market Maker Positioning")
+                        st.metric("Delta Neutral Score", f"{mm_behavior['delta_neutral_score']:.1f}%")
+                        st.metric("Pin Risk", f"{mm_behavior['pin_risk']:.1f}%")
+                        st.metric("Vol/OI Ratio", f"{mm_behavior['vol_oi_ratio']:.2f}")
+                        
+                        if mm_behavior['institutional_flow']:
+                            st.success("🏦 Institutional Flow Detected")
+                        else:
+                            st.info("📊 Normal Market Making Activity")
+                    
+                    with col2:
+                        st.markdown("#### Flow Toxicity Gauge")
+                        
+                        # Create gauge chart for toxicity
+                        toxicity = gex_profile['toxicity_score']
+                        
+                        fig = go.Figure(go.Indicator(
+                            mode="gauge+number+delta",
+                            value=toxicity,
+                            domain={'x': [0, 1], 'y': [0, 1]},
+                            title={'text': "Flow Toxicity Score"},
+                            delta={'reference': 0},
+                            gauge={
+                                'axis': {'range': [-100, 100]},
+                                'bar': {'color': "darkblue"},
+                                'steps': [
+                                    {'range': [-100, -50], 'color': "red"},
+                                    {'range': [-50, 0], 'color': "orange"},
+                                    {'range': [0, 50], 'color': "lightgreen"},
+                                    {'range': [50, 100], 'color': "green"}
+                                ],
+                                'threshold': {
+                                    'line': {'color': "red", 'width': 4},
+                                    'thickness': 0.75,
+                                    'value': 90
+                                }
+                            }
+                        ))
+                        
+                        fig.update_layout(height=250)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        if toxicity > 20:
+                            st.success("Smart money flow detected")
+                        elif toxicity < -20:
+                            st.warning("Retail-heavy flow detected")
+                        else:
+                            st.info("Mixed flow characteristics")
+                
+                # Alerts & Risk tab
+                with analysis_tabs[3]:
+                    st.markdown("### ⚠️ Active Alerts & Risk Monitoring")
+                    
+                    # High priority alerts
+                    alerts = []
+                    
+                    if abs(gex_profile['distance_to_flip']) < 0.5:
+                        alerts.append({
+                            'priority': 'high',
+                            'message': f"Price within {abs(gex_profile['distance_to_flip']):.2f}% of gamma flip",
+                            'action': "Monitor for volatility regime change"
+                        })
+                    
+                    if gex_profile['net_gex'] < -1e9:
+                        alerts.append({
+                            'priority': 'high',
+                            'message': f"Extreme negative GEX: {gex_profile['net_gex']/1e6:.0f}M",
+                            'action': "High volatility environment - consider long gamma"
+                        })
+                    
+                    if gex_profile['mm_behavior']['pin_risk'] > 70:
+                        alerts.append({
+                            'priority': 'medium',
+                            'message': f"High pin risk: {gex_profile['mm_behavior']['pin_risk']:.0f}%",
+                            'action': "Expect price magnetism to nearby strikes"
+                        })
+                    
+                    if alerts:
+                        for alert in alerts:
+                            alert_class = "high-priority" if alert['priority'] == 'high' else "medium-priority"
+                            st.markdown(f"""
+                            <div class="alert-box {alert_class}">
+                                <strong>{alert['message']}</strong><br>
+                                Action: {alert['action']}
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.success("✅ No critical alerts at this time")
+                    
+                    # Risk metrics
+                    st.markdown("### Risk Metrics")
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("Max Loss (Squeeze)", f"${capital * 0.03:,.0f}")
+                    with col2:
+                        st.metric("Max Loss (Premium)", f"${capital * 0.05:,.0f}")
+                    with col3:
+                        st.metric("Max Loss (Condor)", f"${capital * 0.02:,.0f}")
+                
+                # Market Maker Analysis tab
+                with analysis_tabs[4]:
+                    st.markdown("### 🤖 Market Maker Behavior Analysis")
+                    
+                    mm = gex_profile['mm_behavior']
+                    
+                    # Create detailed MM analysis
+                    fig = make_subplots(
+                        rows=2, cols=2,
+                        subplot_titles=("Delta Neutral Activity", "Pin Risk Distribution",
+                                      "Spread Activity", "Institutional vs Retail"),
+                        specs=[[{'type': 'bar'}, {'type': 'scatter'}],
+                              [{'type': 'bar'}, {'type': 'pie'}]]
+                    )
+                    
+                    # Add traces (simplified for demo)
+                    fig.add_trace(
+                        go.Bar(x=['ATM', 'OTM', 'ITM'], 
+                              y=[mm['delta_neutral_score'], 30, 20],
+                              name='Activity'),
+                        row=1, col=1
+                    )
+                    
+                    fig.update_layout(height=600, showlegend=False)
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.error(f"Unable to calculate GEX profile for {symbol}")
+        else:
+            st.error(f"Unable to fetch options data for {symbol}")
+
+# Tab 3: Morning Report
+with tab_morning:
+    st.header("📈 Morning GEX Report")
+    
+    # Auto-generation controls
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        report_time = st.time_input("Auto-generate at", datetime.strptime("08:30", "%H:%M").time())
+    
+    with col2:
+        auto_discord = st.checkbox("Send to Discord", value=True)
+    
+    with col3:
+        if st.button("📊 Generate Now", type="primary", use_container_width=True):
+            with st.spinner("Generating comprehensive morning report..."):
+                # Scan top symbols
+                morning_symbols = SP500_SYMBOLS[:30]  # Top 30 for morning report
+                
+                results = []
+                for symbol in morning_symbols:
+                    try:
+                        options_data = analyzer.get_options_chain(symbol)
+                        if options_data:
+                            gex_profile = analyzer.calculate_gex_profile(options_data)
+                            if gex_profile:
+                                signals = analyzer.generate_all_signals(gex_profile, symbol)
+                                if signals:
+                                    results.append({
+                                        'symbol': symbol,
+                                        'gex_profile': gex_profile,
+                                        'signals': signals
+                                    })
+                    except:
+                        continue
+                
+                # Sort by confidence
+                results.sort(key=lambda x: x['signals'][0]['confidence'], reverse=True)
+                
+                # Generate report
+                st.markdown("## 📊 Morning GEX Report - " + datetime.now().strftime("%B %d, %Y"))
+                
+                # Market Overview
+                st.markdown("### 🌍 Market Regime Assessment")
+                
+                total_gex = sum(r['gex_profile']['net_gex'] for r in results[:10])
+                avg_toxicity = np.mean([r['gex_profile']['toxicity_score'] for r in results[:10]])
+                
+                if total_gex < -5e9:
+                    regime = "HIGH VOLATILITY - Squeeze plays favored"
+                    regime_color = "#FF5722"
+                elif total_gex > 10e9:
+                    regime = "LOW VOLATILITY - Premium selling favored"
+                    regime_color = "#4CAF50"
+                else:
+                    regime = "MIXED - Selective opportunities"
+                    regime_color = "#2196F3"
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, {regime_color}20, {regime_color}10); 
+                            padding: 1.5rem; border-radius: 10px; border-left: 4px solid {regime_color};">
+                    <h3 style="color: {regime_color}; margin: 0;">{regime}</h3>
+                    <p>Total Market GEX: {total_gex/1e9:.2f}B | Flow Toxicity: {avg_toxicity:+.0f}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Top Opportunities
+                st.markdown("### 🎯 Top 5 Priority Trades")
+                
+                for i, result in enumerate(results[:5], 1):
+                    signal = result['signals'][0]
+                    gex = result['gex_profile']
+                    
+                    st.markdown(f"""
+                    #### {i}. {result['symbol']} - {signal['direction'].replace('_', ' ')}
+                    - **Confidence:** {signal['confidence']:.0f}%
+                    - **Entry:** {signal['entry']}
+                    - **Expected Move:** {signal.get('expected_move', 1.0):.1f}% in {signal.get('time_horizon', '1-2 days')}
+                    - **GEX:** {gex['net_gex']/1e6:.0f}M | **Flip:** ${gex['gamma_flip']:.2f}
+                    """)
+                
+                # Opening Range Predictions
+                st.markdown("### 📊 Opening Range Predictions")
+                
+                spy_result = next((r for r in results if r['symbol'] == 'SPY'), None)
+                if spy_result:
+                    gex = spy_result['gex_profile']
+                    current = gex['current_price']
+                    
+                    # Calculate expected range based on walls
+                    upper_wall = gex['call_walls'].iloc[0]['strike'] if len(gex['call_walls']) > 0 else current * 1.01
+                    lower_wall = gex['put_walls'].iloc[0]['strike'] if len(gex['put_walls']) > 0 else current * 0.99
+                    
+                    st.markdown(f"""
+                    **SPY Expected Range:**
+                    - Upper Boundary: ${upper_wall:.2f} (Call wall resistance)
+                    - Lower Boundary: ${lower_wall:.2f} (Put wall support)
+                    - Gamma Flip: ${gex['gamma_flip']:.2f}
+                    - Current: ${current:.2f}
+                    """)
+                
+                # News Integration
+                st.markdown("### 📰 Key Events & Catalysts")
+                news_input = st.text_area("Add relevant news/events (optional):", height=100)
+                
+                # Auto-send to Discord
+                if auto_discord and results:
+                    if st.button("📢 Send Report to Discord"):
+                        # Format and send morning report
+                        morning_message = f"""
+🌅 **MORNING GEX REPORT** - {datetime.now().strftime("%B %d, %Y %I:%M %p ET")}
+
+**Market Regime:** {regime}
+**Total GEX:** {total_gex/1e9:.2f}B
+**Flow Toxicity:** {avg_toxicity:+.0f}
+
+**Top 3 Trades:**
+"""
+                        for result in results[:3]:
+                            signal = result['signals'][0]
+                            morning_message += f"""
+{result['symbol']}: {signal['direction'].replace('_', ' ')} ({signal['confidence']:.0f}%)
+Entry: {signal['entry']} | Target: {signal.get('expected_move', 1.0):.1f}%
+"""
+                        
+                        payload = {'content': morning_message}
+                        response = requests.post(analyzer.discord_webhook, json=payload)
+                        
+                        if response.status_code == 204:
+                            st.success("✅ Morning report sent to Discord")
+
+# Tab 4: Education
+with tab_education:
+    st.header("🎓 GEX Trading Education Center")
+    
+    edu_tabs = st.tabs(["📚 GEX Basics", "🎯 Strategies", "🤖 Market Makers", "📖 Glossary"])
+    
+    with edu_tabs[0]:
+        st.markdown("""
+        ### Understanding Gamma Exposure (GEX)
+        
+        **What is GEX?**
+        Gamma Exposure represents the aggregate gamma positioning of options market makers. 
+        It's calculated as: `Spot Price × Gamma × Open Interest × Contract Multiplier`
+        
+        **Why GEX Matters:**
+        - **Positive GEX:** Market makers must sell rallies and buy dips (volatility suppression)
+        - **Negative GEX:** Market makers must buy rallies and sell dips (volatility amplification)
+        - **Zero GEX (Gamma Flip):** Transition point between regimes
+        
+        **Key Concepts:**
+        1. **Dealer Hedging:** Market makers delta-hedge their options books
+        2. **Gamma Hedging:** Second-order hedging that creates feedback loops
+        3. **Pin Risk:** Concentration of gamma near specific strikes
+        4. **Charm:** Time decay of gamma (accelerates near expiration)
+        """)
+    
+    with edu_tabs[1]:
+        st.markdown("""
+        ### Trading Strategy Deep Dive
+        
+        #### ⚡ Squeeze Plays
+        **When to Use:** Negative GEX environments
+        **Setup:** Price below gamma flip with put wall support
+        **Execution:** Buy ATM/OTM calls for explosive moves
+        **Risk:** Can lose 100% if wrong
+        
+        #### 💰 Premium Selling
+        **When to Use:** High positive GEX environments
+        **Setup:** Strong walls creating boundaries
+        **Execution:** Sell options at wall strikes
+        **Risk:** Unlimited on naked calls
+        
+        #### 🦅 Iron Condors
+        **When to Use:** Stable positive GEX with wide walls
+        **Setup:** Walls >3% apart with concentrated gamma
+        **Execution:** Short strikes at walls, long strikes beyond
+        **Risk:** Limited to spread width minus credit
+        """)
+    
+    with edu_tabs[2]:
+        st.markdown("""
+        ### Market Maker Behavior
+        
+        **Delta-Neutral Trading:**
+        Market makers aim to maintain delta-neutral portfolios, buying/selling stock to offset option deltas.
+        
+        **Gamma Scalping:**
+        In negative gamma positions, MMs must trade against price moves, amplifying volatility.
+        
+        **Pin Risk Management:**
+        Near expiration, MMs aggressively hedge strikes with large open interest.
+        
+        **Institutional vs Retail Flow:**
+        - **Smart Money:** Large blocks, longer dated, balanced strikes
+        - **Retail Flow:** Small lots, weeklies, far OTM strikes
+        """)
+    
+    with edu_tabs[3]:
+        st.markdown("""
+        ### Trading Glossary
+        
+        **ATM (At The Money):** Strike price equal to current stock price
+        **Charm:** Rate of change of delta over time
+        **DTE (Days to Expiration):** Time until option expires
+        **Gamma:** Rate of change of delta with respect to price
+        **GEX (Gamma Exposure):** Aggregate gamma positioning
+        **IV (Implied Volatility):** Market's expectation of volatility
+        **OI (Open Interest):** Number of outstanding contracts
+        **OTM (Out of The Money):** Strike price unfavorable to current price
+        **Pin Risk:** Risk of price gravitating to high gamma strikes
+        **Vanna:** Rate of change of delta with respect to IV
+        **Vol Skew:** Difference in IV across strikes
+        **Zero Gamma:** Price level where net gamma equals zero
+        """)
+
+# Tab 5: Backtesting
+with tab_backtest:
+    st.header("📊 Strategy Backtesting")
+    st.info("Backtesting module coming soon. Will include historical GEX analysis and strategy performance metrics.")
+
+# Tab 6: Settings
+with tab_settings:
+    st.header("⚙️ Dashboard Settings")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Discord Configuration")
+        
+        webhook_url = st.text_input(
+            "Discord Webhook URL",
+            value=analyzer.discord_webhook,
+            type="password"
+        )
+        
+        if st.button("Test Webhook"):
+            test_payload = {
+                'content': f"✅ GEX Dashboard webhook test successful - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            }
+            try:
+                response = requests.post(webhook_url, json=test_payload, timeout=10)
+                if response.status_code == 204:
+                    st.success("Webhook test successful!")
+                else:
+                    st.error(f"Webhook test failed: {response.status_code}")
+            except Exception as e:
+                st.error(f"Webhook error: {str(e)}")
+    
+    with col2:
+        st.markdown("### Data Settings")
+        
+        cache_duration = st.slider("Cache Duration (minutes)", 5, 60, 15)
+        
+        if st.button("Clear Cache"):
+            st.cache_data.clear()
+            st.success("Cache cleared successfully")
+        
+        st.markdown("### Scanner Settings")
+        
+        max_symbols = st.number_input("Max Symbols to Scan", 10, 200, 50)
+        confidence_threshold = st.slider("Min Confidence Threshold", 50, 90, 65)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #666; padding: 1rem;">
+    GEX Trading Dashboard v2.0 | Data updates every 15 minutes during market hours
+</div>
+""", unsafe_allow_html=True)
