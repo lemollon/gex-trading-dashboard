@@ -1214,74 +1214,74 @@ class DealerEdgeAnalyzer:
         
         return signals
     
-    def generate_premium_signals(self, gex_profile):
-        """Generate premium selling signals - FIXED"""
-        signals = []
-        config = self.strategies_config['premium_selling']
+ def generate_premium_signals(self, gex_profile):
+    """Generate premium selling signals - FIXED"""
+    signals = []
+    config = self.strategies_config['premium_selling']
+    
+    net_gex = gex_profile['net_gex']
+    current_price = gex_profile['current_price']
+    call_walls = gex_profile['call_walls']
+    put_walls = gex_profile['put_walls']
+    
+    strategy_direction = "PREMIUM COLLECTION"
+    regime_desc = "Volatility Suppression Environment"
+    
+    if net_gex > config['positive_gex_threshold'] and len(call_walls) > 0:
+        strongest_call = call_walls.iloc[0]
+        wall_distance = ((strongest_call['strike'] - current_price) / current_price) * 100
         
-        net_gex = gex_profile['net_gex']
-        current_price = gex_profile['current_price']
-        call_walls = gex_profile['call_walls']
-        put_walls = gex_profile['put_walls']
-        
-        strategy_direction = "PREMIUM COLLECTION"
-        regime_desc = "Volatility Suppression Environment"
-        
-        if net_gex > config['positive_gex_threshold'] and len(call_walls) > 0:
-            strongest_call = call_walls.iloc[0]
-            wall_distance = ((strongest_call['strike'] - current_price) / current_price) * 100
+        if config['wall_distance_range'][0] < wall_distance < config['wall_distance_range'][1]:
+            wall_strength = strongest_call['call_gex']
+            confidence = min(80, 60 + (wall_strength/config['wall_strength_threshold']) * 10)
+            confidence = round(confidence, 2)  # Round to 2 decimal places
             
-            if config['wall_distance_range'][0] < wall_distance < config['wall_distance_range'][1]:
-                wall_strength = strongest_call['call_gex']
-                confidence = min(80, 60 + (wall_strength/config['wall_strength_threshold']) * 10)
-                confidence = round(confidence, 2)  # Round to 2 decimal places
-                
-                signals.append({
-                    'type': 'PREMIUM_SELLING',
-                    'direction': 'SELL CALLS',
-                    'strategy_type': strategy_direction,
-                    'confidence': confidence,
-                    'entry': f"Sell calls at ${strongest_call['strike']:.2f}",
-                    'target': "50% profit or expiration",
-                    'stop': f"Price crosses ${strongest_call['strike']:.2f}",
-                    'dte': f"{config['dte_range_calls'][0]}-{config['dte_range_calls'][1]} DTE",
-                    'size': f"{self.strategies_config['risk_management']['max_position_size_premium']*100:.0f}%",
-                    'reasoning': f"Strong call wall ({wall_strength/1e6:.0f}M GEX) at {wall_distance:.1f}% above",
-                    'regime': regime_desc,
-                    'expected_move': wall_distance * 0.5,
-                    'time_horizon': "1-2 days",
-                    'win_rate': 70,
-                    'position_size': self.trading_capital * self.strategies_config['risk_management']['max_position_size_premium']
-                })
+            signals.append({
+                'type': 'PREMIUM_SELLING',
+                'direction': 'SELL CALLS',
+                'strategy_type': strategy_direction,
+                'confidence': confidence,
+                'entry': f"Sell calls at ${strongest_call['strike']:.2f}",
+                'target': "50% profit or expiration",
+                'stop': f"Price crosses ${strongest_call['strike']:.2f}",
+                'dte': f"{config['dte_range_calls'][0]}-{config['dte_range_calls'][1]} DTE",
+                'size': f"{self.strategies_config['risk_management']['max_position_size_premium']*100:.0f}%",
+                'reasoning': f"Strong call wall ({wall_strength/1e6:.0f}M GEX) at {wall_distance:.1f}% above",
+                'regime': regime_desc,
+                'expected_move': wall_distance * 0.5,
+                'time_horizon': "1-2 days",
+                'win_rate': 70,
+                'position_size': self.trading_capital * self.strategies_config['risk_management']['max_position_size_premium']
+            })
+    
+    if net_gex > 0 and len(put_walls) > 0:
+        strongest_put = put_walls.iloc[0]
+        wall_distance = ((current_price - strongest_put['strike']) / current_price) * 100
         
-        if net_gex > 0 and len(put_walls) > 0:
-            strongest_put = put_walls.iloc[0]
-            wall_distance = ((current_price - strongest_put['strike']) / current_price) * 100
+        if config['put_distance_range'][0] < wall_distance < config['put_distance_range'][1]:
+            wall_strength = abs(strongest_put['put_gex'])
+            confidence = min(75, 55 + (wall_strength/config['wall_strength_threshold']) * 10)
+            confidence = round(confidence, 2)  # Round to 2 decimal places
             
-            if config['put_distance_range'][0] < wall_distance < config['put_distance_range'][1]:
-                wall_strength = abs(strongest_put['put_gex'])
-                confidence = min(75, 55 + (wall_strength/config['wall_strength_threshold']) * 10)
-                confidence = round(confidence, 2)  # Round to 2 decimal places
-                
-signals.append({
-    'type': 'PREMIUM_SELLING',
-    'direction': 'SELL PUTS',
-    'strategy_type': strategy_direction,
-    'confidence': confidence,
-    'entry': f"Sell puts at ${strongest_put['strike']:.2f}",
-    'target': "50% profit or expiration",
-    'stop': f"Price crosses ${strongest_put['strike']:.2f}",
-    'dte': f"{config['dte_range_puts'][0]}-{config['dte_range_puts'][1]} DTE",
-    'size': f"{self.strategies_config['risk_management']['max_position_size_premium']*100:.0f}%",
-    'reasoning': f"Strong put wall ({wall_strength/1e6:.0f}M GEX) at {wall_distance:.1f}% below",
-    'regime': regime_desc,
-    'expected_move': wall_distance * 0.3,
-    'time_horizon': "2-5 days",
-    'win_rate': 75,
-    'position_size': self.trading_capital * self.strategies_config['risk_management']['max_position_size_premium']
-})
-        
-        return signals
+            signals.append({
+                'type': 'PREMIUM_SELLING',
+                'direction': 'SELL PUTS',
+                'strategy_type': strategy_direction,
+                'confidence': confidence,
+                'entry': f"Sell puts at ${strongest_put['strike']:.2f}",
+                'target': "50% profit or expiration",
+                'stop': f"Price crosses ${strongest_put['strike']:.2f}",
+                'dte': f"{config['dte_range_puts'][0]}-{config['dte_range_puts'][1]} DTE",
+                'size': f"{self.strategies_config['risk_management']['max_position_size_premium']*100:.0f}%",
+                'reasoning': f"Strong put wall ({wall_strength/1e6:.0f}M GEX) at {wall_distance:.1f}% below",
+                'regime': regime_desc,
+                'expected_move': wall_distance * 0.3,
+                'time_horizon': "2-5 days",
+                'win_rate': 75,
+                'position_size': self.trading_capital * self.strategies_config['risk_management']['max_position_size_premium']
+            })
+    
+    return signals  # Dedented to align with function scope
     
     def generate_condor_signals(self, gex_profile):
         """Generate iron condor signals"""
