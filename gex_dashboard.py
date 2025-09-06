@@ -1727,10 +1727,13 @@ with tabs[1]:
                             st.warning("Retail-heavy flow - fade the crowd")
                         else:
                             st.info("Mixed flow - no clear edge")
-                
-                # MM Behavior tab
+# MM Behavior tab
                 with analysis_tabs[3]:
                     st.markdown("### 🤖 Market Maker Behavior Analysis")
+                    
+                    # Prepare the wall values
+                    call_wall_str = f"${call_walls.iloc[0]['strike']:.2f}" if len(call_walls) > 0 else "None"
+                    put_wall_str = f"${put_walls.iloc[0]['strike']:.2f}" if len(put_walls) > 0 else "None"
                     
                     st.markdown(f"""
                     **Current MM Status:** {mm_status}
@@ -1749,13 +1752,9 @@ with tabs[1]:
                     
                     **Key Levels to Watch:**
                     - Gamma Flip: ${flip:.2f} (regime change)
-                    - Call Wall: ${call_walls.iloc[0]['strike']:.2f if len(call_walls) > 0 else 'None'}
-                    - Put Wall: ${put_walls.iloc[0]['strike']:.2f if len(put_walls) > 0 else 'None'}
-                    """)
-            else:
-                st.error(f"Unable to calculate GEX profile for {symbol}")
-        else:
-            st.error(f"Unable to fetch options data for {symbol}")
+                    - Call Wall: {call_wall_str}
+                    - Put Wall: {put_wall_str}
+                    """)                
 
 # TAB 3: Morning Report - AUTO WEB SCRAPING
 with tabs[2]:
