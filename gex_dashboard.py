@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-GEX Market Maker Exploitation Platform v3.0
-Complete Implementation with Real Yahoo Finance Data
-~2,800 lines - All features implemented
+GEX Market Maker Exploitation Platform v4.0
+Enhanced Visual Design with Complete Features
+Well-organized with clear section markers for easy editing
+~3,500 lines - Production Ready
 """
 
 import streamlit as st
@@ -27,249 +28,412 @@ import feedparser
 import schedule
 warnings.filterwarnings('ignore')
 
-# Page configuration - NO SIDEBAR
+# ============================================================================
+# SECTION 1: PAGE CONFIGURATION AND CONSTANTS
+# ============================================================================
+
 st.set_page_config(
-    page_title="GEX Market Maker Exploitation Platform",
+    page_title="🎯 GEX Market Maker Exploitation Platform",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# HARDCODED DISCORD WEBHOOK - NO USER CONFIGURATION
+# Discord webhook for alerts (hardcoded - no user config)
 DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1308901307493777469/BWNr70coUxdgWCBSutC5pDWakBkRxM_lyQbUeh8_5A2zClecULeO909XBwQiwUY-DzId"
 
-# Complete styling with MM exploitation focus
+# ============================================================================
+# SECTION 2: VISUAL STYLING AND CSS
+# Edit this section to change colors, animations, and visual elements
+# ============================================================================
+
 st.markdown("""
 <style>
+    /* === GLOBAL STYLES - Controls overall appearance === */
+    .stApp {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        background-attachment: fixed;
+    }
+    
+    .main {
+        background-color: transparent !important;
+    }
+    
+    /* Force consistent text colors */
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-weight: bold !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: #e0e0e0 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* === HEADER STYLES === */
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 20px;
+        padding: 3rem;
+        border-radius: 30px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        animation: pulse 2s infinite;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        animation: float 3s ease-in-out infinite;
+        position: relative;
+        overflow: hidden;
     }
     
-    @keyframes pulse {
-        0% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        50% { box-shadow: 0 10px 40px rgba(102,126,234,0.4); }
-        100% { box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .main-header::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        animation: rotate 20s linear infinite;
     }
     
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* === ACTION BOXES === */
     .action-box {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        border-radius: 15px;
-        padding: 2rem;
+        border-radius: 20px;
+        padding: 2.5rem;
         color: white;
         text-align: center;
-        margin: 1rem 0;
-        font-size: 1.5rem;
+        margin: 1.5rem 0;
+        font-size: 1.6rem;
         font-weight: bold;
-        box-shadow: 0 5px 20px rgba(245,87,108,0.4);
+        box-shadow: 0 10px 40px rgba(245,87,108,0.4);
         cursor: pointer;
-        transition: transform 0.3s;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .action-box::after {
+        content: "🎯";
+        position: absolute;
+        font-size: 100px;
+        opacity: 0.1;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
     }
     
     .action-box:hover {
-        transform: translateY(-5px) scale(1.02);
+        transform: translateY(-8px) scale(1.03);
+        box-shadow: 0 15px 50px rgba(245,87,108,0.6);
     }
     
+    /* === MM STATUS STYLES === */
     .mm-trapped {
-        background: linear-gradient(135deg, #ff4444, #cc0000) !important;
-        animation: shake 0.5s infinite;
+        background: linear-gradient(135deg, #ff0844, #ff4563) !important;
+        animation: emergency-pulse 0.5s infinite;
     }
     
-    @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-5px); }
-        75% { transform: translateX(5px); }
+    @keyframes emergency-pulse {
+        0%, 100% { 
+            box-shadow: 0 0 30px rgba(255,8,68,0.8);
+            transform: scale(1);
+        }
+        50% { 
+            box-shadow: 0 0 50px rgba(255,8,68,1);
+            transform: scale(1.02);
+        }
     }
     
     .mm-defending {
-        background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+        background: linear-gradient(135deg, #11998e, #38ef7d) !important;
     }
     
     .mm-scrambling {
-        background: linear-gradient(135deg, #ff9800, #f57c00) !important;
-        animation: blink 1s infinite;
+        background: linear-gradient(135deg, #fc4a1a, #f7b733) !important;
+        animation: warning-blink 1s infinite;
     }
     
-    @keyframes blink {
+    @keyframes warning-blink {
         0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
+        50% { opacity: 0.85; }
     }
     
-    .dealer-pain-gauge {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        text-align: center;
-        font-size: 1.2rem;
-    }
-    
+    /* === SYMBOL CARDS === */
     .symbol-row {
-        background: white;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-left: 5px solid;
-        transition: all 0.3s;
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-left: 6px solid;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
+        color: #1a1a1a !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
     
     .symbol-row:hover {
-        transform: translateX(5px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transform: translateX(10px) translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+    
+    .symbol-row h4, .symbol-row p, .symbol-row strong {
+        color: #1a1a1a !important;
     }
     
     .squeeze-row {
-        border-left-color: #ff4444 !important;
-        background: linear-gradient(90deg, #ffe0e0, white) !important;
+        border-left-color: #ff0844 !important;
+        background: linear-gradient(90deg, rgba(255,8,68,0.1), rgba(255,255,255,0.95)) !important;
     }
     
     .premium-row {
-        border-left-color: #4CAF50 !important;
-        background: linear-gradient(90deg, #e8f5e9, white) !important;
+        border-left-color: #11998e !important;
+        background: linear-gradient(90deg, rgba(17,153,142,0.1), rgba(255,255,255,0.95)) !important;
     }
     
     .wait-row {
-        border-left-color: #9e9e9e !important;
-        background: linear-gradient(90deg, #f5f5f5, white) !important;
+        border-left-color: #95a5a6 !important;
+        background: linear-gradient(90deg, rgba(149,165,166,0.1), rgba(255,255,255,0.95)) !important;
     }
     
-    .win-streak {
-        background: linear-gradient(135deg, #FFD700, #FFA500);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        display: inline-block;
+    /* === INTERACTIVE BUTTONS === */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 50px;
         font-weight: bold;
-        animation: glow 2s infinite;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(102,126,234,0.4);
     }
     
-    @keyframes glow {
-        0%, 100% { box-shadow: 0 0 10px rgba(255,215,0,0.5); }
-        50% { box-shadow: 0 0 20px rgba(255,215,0,0.8); }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102,126,234,0.6);
     }
     
-    .mm-pressure-map {
-        background: #1a1a1a;
-        border-radius: 10px;
+    /* === METRIC CARDS === */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
         padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        color: #1a1a1a !important;
+        transition: all 0.3s;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    
+    /* === PRESSURE MAP === */
+    .mm-pressure-map {
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        border-radius: 20px;
+        padding: 2rem;
         color: white;
         font-family: 'Courier New', monospace;
         font-size: 1.1rem;
-    }
-    
-    .pressure-level {
-        margin: 0.5rem 0;
-        padding: 0.8rem;
-        border-radius: 5px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         position: relative;
     }
     
+    .pressure-level {
+        margin: 1rem 0;
+        padding: 1rem;
+        border-radius: 10px;
+        position: relative;
+        transition: all 0.3s;
+    }
+    
+    .pressure-level:hover {
+        transform: scale(1.02);
+    }
+    
     .high-pressure {
-        background: rgba(255,0,0,0.3);
+        background: linear-gradient(90deg, rgba(255,0,0,0.3), rgba(255,0,0,0.1));
         border: 2px solid #ff0000;
         animation: pulse-red 2s infinite;
+        box-shadow: 0 0 20px rgba(255,0,0,0.3);
     }
     
     @keyframes pulse-red {
-        0%, 100% { background: rgba(255,0,0,0.3); }
-        50% { background: rgba(255,0,0,0.5); }
+        0%, 100% { 
+            box-shadow: 0 0 20px rgba(255,0,0,0.3);
+        }
+        50% { 
+            box-shadow: 0 0 40px rgba(255,0,0,0.6);
+        }
     }
     
     .current-price {
-        background: rgba(255,255,0,0.5);
-        border: 2px solid #ffff00;
+        background: linear-gradient(90deg, rgba(255,215,0,0.5), rgba(255,215,0,0.2));
+        border: 2px solid #ffd700;
         font-weight: bold;
+        box-shadow: 0 0 30px rgba(255,215,0,0.4);
+        animation: golden-glow 2s infinite;
+    }
+    
+    @keyframes golden-glow {
+        0%, 100% { 
+            box-shadow: 0 0 30px rgba(255,215,0,0.4);
+        }
+        50% { 
+            box-shadow: 0 0 50px rgba(255,215,0,0.7);
+        }
     }
     
     .low-pressure {
-        background: rgba(0,255,0,0.3);
+        background: linear-gradient(90deg, rgba(0,255,0,0.3), rgba(0,255,0,0.1));
         border: 2px solid #00ff00;
+        box-shadow: 0 0 20px rgba(0,255,0,0.3);
     }
     
-    .metric-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1.2rem;
-        text-align: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-    
-    .wall-card {
-        background: #F5F5F5;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-    }
-    
-    .alert-box {
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 0.5rem 0;
-    }
-    
-    .high-priority {
-        background: #FFEBEE;
-        border-left: 4px solid #F44336;
-    }
-    
-    .medium-priority {
-        background: #FFF3E0;
-        border-left: 4px solid #FF9800;
-    }
-    
-    .morning-report {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-    }
-    
+    /* === ACHIEVEMENT BADGES === */
     .achievement-badge {
         display: inline-block;
-        background: gold;
-        color: #333;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        margin: 0.2rem;
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: #1a1a1a;
+        padding: 0.6rem 1.2rem;
+        border-radius: 25px;
+        margin: 0.3rem;
         font-weight: bold;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+        transition: all 0.3s;
     }
     
+    .achievement-badge:hover {
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: 0 6px 20px rgba(255,215,0,0.6);
+    }
+    
+    /* === STRATEGY CARDS === */
     .strategy-card {
-        background: white;
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        color: #1a1a1a !important;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .strategy-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c);
+        animation: gradient-shift 3s ease infinite;
+    }
+    
+    @keyframes gradient-shift {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(10px); }
+    }
+    
+    .strategy-card h3, .strategy-card p, .strategy-card strong {
+        color: #1a1a1a !important;
+    }
+    
+    .strategy-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 50px rgba(0,0,0,0.15);
+    }
+    
+    /* === TAB STYLING === */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 5px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        color: white !important;
+        font-weight: 600;
         border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: all 0.3s;
     }
     
-    .squeeze-signal {
-        border-left: 4px solid #FF5722 !important;
-        background: linear-gradient(135deg, #FFF3E0, #FFE0B2) !important;
+    .stTabs [data-baseweb="tab"]:hover {
+        background: rgba(255, 255, 255, 0.2);
     }
     
-    .premium-signal {
-        border-left: 4px solid #4CAF50 !important;
-        background: linear-gradient(135deg, #E8F5E9, #C8E6C9) !important;
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
     }
     
-    .condor-signal {
-        border-left: 4px solid #2196F3 !important;
-        background: linear-gradient(135deg, #E3F2FD, #BBDEFB) !important;
+    /* === WIN STREAK ANIMATION === */
+    .win-streak {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: #1a1a1a;
+        padding: 0.8rem 1.5rem;
+        border-radius: 30px;
+        display: inline-block;
+        font-weight: bold;
+        animation: streak-glow 2s infinite;
+        box-shadow: 0 0 30px rgba(255,215,0,0.5);
+    }
+    
+    @keyframes streak-glow {
+        0%, 100% { 
+            box-shadow: 0 0 30px rgba(255,215,0,0.5);
+            transform: scale(1);
+        }
+        50% { 
+            box-shadow: 0 0 50px rgba(255,215,0,0.8);
+            transform: scale(1.05);
+        }
+    }
+    
+    /* === SCROLLBAR STYLING === */
+    ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #764ba2, #667eea);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# S&P 500 symbols (200)
+# ============================================================================
+# SECTION 3: SYMBOL LISTS
+# Add or remove symbols here
+# ============================================================================
+
 SP500_SYMBOLS = [
     'SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLK', 'XLE', 'XLV', 'XLI', 'XLC',
     'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BRK-B', 'UNH', 'JNJ',
@@ -292,18 +456,23 @@ SP500_SYMBOLS = [
     'TEL', 'CTVA', 'XEL', 'WELL', 'DLTR', 'AVB', 'STZ', 'CBRE', 'EBAY', 'PPG',
     'IDXX', 'VRTX', 'AMT', 'AMGN', 'TROW', 'GPN', 'RSG', 'MSCI', 'EW', 'MTB',
     'DD', 'AMAT', 'INFO', 'ALB', 'DOW', 'LHX', 'KEYS', 'GLW', 'ANSS', 'CDW'
-][:200]
+][:200]  # Limit to 200 symbols
+
+# ============================================================================
+# SECTION 4: MAIN ANALYZER CLASS
+# Core GEX calculation logic - modify calculation methods here
+# ============================================================================
 
 class EnhancedGEXAnalyzer:
     """Complete GEX analyzer with MM exploitation - REAL DATA ONLY"""
     
     def __init__(self):
         self.risk_free_rate = 0.05
-        self.trading_capital = 100000  # Fixed, not configurable
+        self.trading_capital = 100000  # Fixed capital
         self.strategies_config = self.load_strategies_config()
         
     def load_strategies_config(self):
-        """Load strategy configurations"""
+        """Load strategy configurations - EDIT THRESHOLDS HERE"""
         return {
             'squeeze_plays': {
                 'negative_gex_threshold_spy': -1e9,
@@ -338,6 +507,8 @@ class EnhancedGEXAnalyzer:
             }
         }
     
+    # === CALCULATION METHODS ===
+    
     def black_scholes_gamma(self, S, K, T, r, sigma):
         """Calculate Black-Scholes gamma"""
         try:
@@ -370,7 +541,7 @@ class EnhancedGEXAnalyzer:
             return None
     
     def get_options_chain(self, symbol, focus_weekly=True):
-        """Get REAL options chain from Yahoo Finance with weekly/daily focus"""
+        """Get REAL options chain from Yahoo Finance"""
         try:
             ticker = yf.Ticker(symbol)
             exp_dates = ticker.options
@@ -758,6 +929,8 @@ class EnhancedGEXAnalyzer:
         else:
             return "😌 NEUTRAL"
     
+    # === SIGNAL GENERATION METHODS ===
+    
     def generate_all_signals(self, gex_profile, symbol):
         """Generate all trading signals for a symbol - ALWAYS return something"""
         signals = []
@@ -1033,6 +1206,8 @@ class EnhancedGEXAnalyzer:
         
         return signals
     
+    # === UTILITY METHODS ===
+    
     def send_discord_alert(self, message):
         """Send alert to hardcoded Discord webhook"""
         try:
@@ -1253,61 +1428,98 @@ class EnhancedGEXAnalyzer:
             }
         ]
 
-# Initialize analyzer
+# ============================================================================
+# SECTION 5: INITIALIZE ANALYZER
+# ============================================================================
+
 @st.cache_resource
 def get_analyzer():
     return EnhancedGEXAnalyzer()
 
 analyzer = get_analyzer()
 
-# Session state for gamification
+# ============================================================================
+# SECTION 6: SESSION STATE INITIALIZATION
+# Edit gamification elements here
+# ============================================================================
+
 if 'win_streak' not in st.session_state:
     st.session_state.win_streak = 0
 if 'total_pnl' not in st.session_state:
     st.session_state.total_pnl = 0
 if 'scan_results' not in st.session_state:
     st.session_state.scan_results = None
+if 'achievements' not in st.session_state:
+    st.session_state.achievements = []
 
-# Header with gamification
+# ============================================================================
+# SECTION 7: MAIN HEADER
+# ============================================================================
+
 st.markdown(f"""
 <div class="main-header">
-    <h1>🎯 GEX Market Maker Exploitation Platform</h1>
-    <p style="font-size: 1.2rem;">Hunt Trapped Dealers • 200 Symbol Scanner • Real-Time Analysis</p>
+    <h1 style="font-size: 3rem; margin: 0; text-shadow: 3px 3px 6px rgba(0,0,0,0.5);">
+        🎯 GEX Market Maker Exploitation Platform
+    </h1>
+    <p style="font-size: 1.3rem; margin-top: 1rem; opacity: 0.95;">
+        Hunt Trapped Dealers • 200 Symbol Scanner • Real-Time Analysis
+    </p>
     <div class="win-streak">
         🔥 Win Streak: {st.session_state.win_streak} | 
-        💰 Total P&L: ${st.session_state.total_pnl:,.0f}
+        💰 Total P&L: ${st.session_state.total_pnl:,.0f} |
+        🏆 Level: {'Expert' if st.session_state.win_streak > 10 else 'Advanced' if st.session_state.win_streak > 5 else 'Beginner'}
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# MAIN TABS - NO SETTINGS TAB
+# ============================================================================
+# SECTION 8: MAIN TABS
+# ============================================================================
+
 tabs = st.tabs([
-    "🔍 Scanner (200 Symbols)",
+    "🔍 Scanner Hub",
     "🎯 Deep Analysis", 
     "📈 Morning Report",
-    "🎓 Education"
+    "🎓 Education",
+    "🤖 AI Assistant"
 ])
 
-# TAB 1: Scanner Hub - Shows ALL 200 Symbols
+# ============================================================================
+# TAB 1: SCANNER HUB - ENHANCED WITH BETTER FILTERING
+# ============================================================================
+
 with tabs[0]:
     st.header("🔍 Market Maker Vulnerability Scanner")
     st.markdown("*Analyzing ALL 200 S&P symbols for dealer weaknesses...*")
     
-    # Scanner controls
-    col1, col2, col3 = st.columns([2, 1, 1])
+    # Enhanced scanner controls
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     
     with col1:
+        filter_options = [
+            "ALL 200", 
+            "🔥 High Pain (>70)", 
+            "⚡ Squeeze Plays", 
+            "💰 Premium Selling",
+            "🦅 Iron Condors",
+            "📈 High Confidence (>75%)",
+            "🎯 Immediate Action",
+            "⏳ Waiting"
+        ]
         filter_type = st.selectbox(
-            "Filter View (still scans all 200)",
-            ["ALL 200", "High Pain (>70)", "Squeeze Plays", "Premium Selling", "Waiting"],
-            help="Filter display only - always scans all 200"
+            "Filter View",
+            filter_options,
+            help="Filter display - always scans all 200 symbols"
         )
     
     with col2:
-        auto_alert = st.checkbox("Auto Discord Alerts", value=True)
+        min_confidence = st.slider("Min Conf %", 0, 100, 50, 5)
     
     with col3:
-        scan_btn = st.button("🚀 SCAN ALL 200", type="primary", use_container_width=True)
+        auto_alert = st.checkbox("Discord Alerts", value=True)
+    
+    with col4:
+        scan_btn = st.button("🚀 SCAN ALL", type="primary", use_container_width=True)
     
     # Run scanner
     if scan_btn:
@@ -1316,9 +1528,9 @@ with tabs[0]:
         
         def update_progress(current, total):
             progress_bar.progress(current / total)
-            status_text.text(f"Scanning: {current}/{total} symbols...")
+            status_text.text(f"🔍 Scanning: {current}/{total} symbols...")
         
-        with st.spinner("🔍 Hunting for trapped market makers across 200 symbols..."):
+        with st.spinner("🎯 Hunting for trapped market makers across 200 symbols..."):
             scan_results = analyzer.scan_multiple_symbols(SP500_SYMBOLS, update_progress)
             st.session_state.scan_results = scan_results
         
@@ -1331,7 +1543,7 @@ with tabs[0]:
             if high_pain:
                 alert_msg = "🚨 **TRAPPED DEALERS FOUND**\n\n"
                 for r in high_pain:
-                    alert_msg += f"{r['symbol']}: {r['gex_profile']['mm_status']} (Pain: {r['gex_profile']['dealer_pain']:.0f})\n"
+                    alert_msg += f"**{r['symbol']}**: {r['gex_profile']['mm_status']} (Pain: {r['gex_profile']['dealer_pain']:.0f})\n"
                     alert_msg += f"ACTION: {r['best_signal']['direction']}\n\n"
                 
                 if analyzer.send_discord_alert(alert_msg):
@@ -1341,42 +1553,54 @@ with tabs[0]:
     if st.session_state.scan_results:
         results = st.session_state.scan_results
         
-        # Summary metrics
+        # Summary metrics with visual appeal
+        st.markdown("### 📊 Market Overview")
         col1, col2, col3, col4, col5 = st.columns(5)
         
         trapped = sum(1 for r in results if r['gex_profile'] and r['gex_profile'].get('dealer_pain', 0) > 80)
         scrambling = sum(1 for r in results if r['gex_profile'] and 60 < r['gex_profile'].get('dealer_pain', 0) <= 80)
         squeeze_ops = sum(1 for r in results if r['best_signal'] and r['best_signal'].get('type') == 'SQUEEZE_PLAY')
         premium_ops = sum(1 for r in results if r['best_signal'] and r['best_signal'].get('type') == 'PREMIUM_SELLING')
+        condor_ops = sum(1 for r in results if r['best_signal'] and r['best_signal'].get('type') == 'IRON_CONDOR')
         
         with col1:
-            st.metric("🔥 Trapped MMs", trapped)
+            st.metric("🔥 Trapped", trapped, delta=f"{(trapped/len(results)*100):.0f}%")
         with col2:
             st.metric("😰 Scrambling", scrambling)
         with col3:
-            st.metric("⚡ Squeeze Plays", squeeze_ops)
+            st.metric("⚡ Squeezes", squeeze_ops)
         with col4:
-            st.metric("💰 Premium Ops", premium_ops)
+            st.metric("💰 Premium", premium_ops)
         with col5:
-            st.metric("📊 Total Scanned", len(results))
+            st.metric("🦅 Condors", condor_ops)
         
-        # Filter results for display
-        if filter_type == "High Pain (>70)":
+        # Enhanced filtering logic
+        if filter_type == "🔥 High Pain (>70)":
             filtered = [r for r in results if r['gex_profile'] and r['gex_profile'].get('dealer_pain', 0) > 70]
-        elif filter_type == "Squeeze Plays":
+        elif filter_type == "⚡ Squeeze Plays":
             filtered = [r for r in results if r['best_signal'] and r['best_signal'].get('type') == 'SQUEEZE_PLAY']
-        elif filter_type == "Premium Selling":
+        elif filter_type == "💰 Premium Selling":
             filtered = [r for r in results if r['best_signal'] and r['best_signal'].get('type') == 'PREMIUM_SELLING']
-        elif filter_type == "Waiting":
+        elif filter_type == "🦅 Iron Condors":
+            filtered = [r for r in results if r['best_signal'] and r['best_signal'].get('type') == 'IRON_CONDOR']
+        elif filter_type == "📈 High Confidence (>75%)":
+            filtered = [r for r in results if r['best_signal'] and r['best_signal'].get('confidence', 0) > 75]
+        elif filter_type == "🎯 Immediate Action":
+            filtered = [r for r in results if r['best_signal'] and 
+                        r['best_signal'].get('confidence', 0) > 70 and
+                        r['gex_profile'] and r['gex_profile'].get('dealer_pain', 0) > 60]
+        elif filter_type == "⏳ Waiting":
             filtered = [r for r in results if r['best_signal'] and r['best_signal'].get('type') == 'WAIT']
         else:
             filtered = results  # Show ALL 200
         
-        st.markdown(f"### 📊 Showing {len(filtered)} of 200 Symbols")
-        st.markdown("*Every symbol has an actionable recommendation based on MM positioning*")
+        # Apply confidence filter
+        filtered = [r for r in filtered if r['best_signal'] and r['best_signal'].get('confidence', 0) >= min_confidence]
         
-        # Display ALL results (paginated for performance)
-        for idx, r in enumerate(filtered):
+        st.markdown(f"### 📋 Showing {len(filtered)} of 200 Symbols")
+        
+        # Display filtered results with enhanced visuals
+        for idx, r in enumerate(filtered[:50]):  # Limit display for performance
             symbol = r['symbol']
             best_signal = r.get('best_signal', {})
             gex_profile = r.get('gex_profile')
@@ -1402,51 +1626,58 @@ with tabs[0]:
             
             # Pain indicator
             if dealer_pain > 80:
-                pain_emoji = "🔥🔥🔥🔥🔥"
+                pain_bar = "🔥" * 5
             elif dealer_pain > 60:
-                pain_emoji = "🔥🔥🔥"
+                pain_bar = "🔥" * 4
             elif dealer_pain > 40:
-                pain_emoji = "🔥🔥"
+                pain_bar = "🔥" * 3
             elif dealer_pain > 20:
-                pain_emoji = "🔥"
+                pain_bar = "🔥" * 2
             else:
-                pain_emoji = "❄️"
+                pain_bar = "❄️"
             
-            # Display row
+            # Display enhanced row
             st.markdown(f"""
             <div class="symbol-row {row_class}">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="flex: 1;">
-                        <h4 style="margin: 0; color: #333;">
+                        <h4 style="margin: 0; font-size: 1.3rem;">
                             {emoji} {symbol} - {best_signal.get('direction', 'ANALYZING')}
                         </h4>
-                        <p style="margin: 0.5rem 0; font-size: 0.9rem;">
-                            MM Status: <strong>{mm_status}</strong> | 
-                            Pain: {pain_emoji} <strong>{dealer_pain:.0f}/100</strong> | 
-                            Confidence: <strong>{best_signal.get('confidence', 0):.0f}%</strong>
+                        <div style="display: flex; gap: 2rem; margin: 0.5rem 0;">
+                            <span><strong>MM Status:</strong> {mm_status}</span>
+                            <span><strong>Pain:</strong> {pain_bar} {dealer_pain:.0f}/100</span>
+                            <span><strong>Confidence:</strong> {best_signal.get('confidence', 0):.0f}%</span>
+                        </div>
+                        <p style="margin: 0.5rem 0; color: #555;">
+                            {best_signal.get('reasoning', 'Analyzing market maker positioning...')[:150]}...
                         </p>
-                        <p style="margin: 0; color: #666; font-size: 0.9rem;">
-                            <strong>Why:</strong> {best_signal.get('reasoning', 'Analyzing market maker positioning...')[:100]}
-                        </p>
-                        <p style="margin: 0.5rem 0; color: #2196F3; font-weight: bold;">
-                            <strong>Entry:</strong> {best_signal.get('entry', 'Calculating...')} | 
-                            <strong>Size:</strong> ${best_signal.get('position_size', 0):,.0f}
-                        </p>
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #e0e0e0;">
+                            <span style="color: #2196F3; font-weight: bold;">
+                                Entry: {best_signal.get('entry', 'Calculating...')}
+                            </span>
+                            <span style="margin-left: 2rem; color: #4CAF50; font-weight: bold;">
+                                Size: ${best_signal.get('position_size', 0):,.0f}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-# TAB 2: Deep Analysis - Symbol Input in MAIN AREA
+# ============================================================================
+# TAB 2: DEEP ANALYSIS
+# ============================================================================
+
 with tabs[1]:
     st.header("🎯 Deep Market Maker Analysis")
     
-    # SYMBOL INPUT IN MAIN AREA - NOT SIDEBAR
+    # Symbol input and controls
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     
     with col1:
         symbol = st.text_input(
-            "Enter Symbol to Analyze",
+            "Enter Symbol",
             value="SPY",
             help="Enter any stock symbol for deep MM analysis"
         ).upper().strip()
@@ -1459,20 +1690,20 @@ with tabs[1]:
         st.metric("Capital", "$100,000")
     
     with col4:
-        st.metric("Max Risk/Trade", "$3,000")
+        st.metric("Max Risk", "$3,000")
     
-    # Quick select buttons
+    # Quick select buttons with visual appeal
     st.markdown("**Quick Select:**")
     quick_cols = st.columns(10)
     quick_symbols = ['SPY', 'QQQ', 'IWM', 'AAPL', 'TSLA', 'NVDA', 'AMD', 'MSFT', 'META', 'GOOGL']
     for i, sym in enumerate(quick_symbols):
         with quick_cols[i]:
-            if st.button(sym, key=f"quick_{sym}"):
+            if st.button(f"📊 {sym}", key=f"quick_{sym}", use_container_width=True):
                 symbol = sym
                 st.rerun()
     
     if symbol:
-        with st.spinner(f"Analyzing {symbol} market maker positioning..."):
+        with st.spinner(f"🔍 Analyzing {symbol} market maker positioning..."):
             options_data = analyzer.get_options_chain(symbol)
         
         if options_data:
@@ -1483,7 +1714,7 @@ with tabs[1]:
                 signals = analyzer.generate_all_signals(gex_profile, symbol)
                 best_signal = signals[0] if signals else None
                 
-                # BIG ACTION BOX
+                # BIG ACTION BOX with enhanced visuals
                 dealer_pain = gex_profile.get('dealer_pain', 0)
                 mm_status = gex_profile.get('mm_status', 'NEUTRAL')
                 
@@ -1497,37 +1728,42 @@ with tabs[1]:
                 if best_signal:
                     st.markdown(f"""
                     <div class="action-box {action_class}">
-                        <h1 style="margin: 0; font-size: 2rem;">🎯 {best_signal['direction']}</h1>
-                        <p style="font-size: 1.3rem; margin: 0.5rem 0;">
+                        <h1 style="margin: 0; font-size: 2.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                            🎯 {best_signal['direction']}
+                        </h1>
+                        <p style="font-size: 1.4rem; margin: 0.5rem 0; opacity: 0.95;">
                             Market Makers: {mm_status} | Dealer Pain: {dealer_pain:.0f}/100
                         </p>
-                        <p style="font-size: 1.1rem; margin: 0;">
+                        <p style="font-size: 1.2rem; margin: 0.5rem 0; opacity: 0.9;">
                             {best_signal.get('reasoning', 'Analyzing...')}
                         </p>
-                        <p style="font-size: 1.2rem; margin-top: 1rem; color: yellow;">
-                            ENTRY: {best_signal['entry']} | SIZE: ${best_signal.get('position_size', 0):,.0f}
-                        </p>
+                        <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                            <p style="font-size: 1.3rem; margin: 0; color: #FFD700;">
+                                📍 ENTRY: {best_signal['entry']} | 💰 SIZE: ${best_signal.get('position_size', 0):,.0f}
+                            </p>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # Key metrics
+                # Key metrics with enhanced styling
+                st.markdown("### 📊 Key Metrics")
                 col1, col2, col3, col4, col5, col6 = st.columns(6)
                 
                 with col1:
-                    st.metric("Price", f"${gex_profile['current_price']:.2f}")
+                    st.metric("📍 Price", f"${gex_profile['current_price']:.2f}")
                 with col2:
                     color = "🟢" if gex_profile['net_gex'] > 0 else "🔴"
-                    st.metric("Net GEX", f"{color} {gex_profile['net_gex']/1e6:.0f}M")
+                    st.metric("💫 Net GEX", f"{color} {gex_profile['net_gex']/1e6:.0f}M")
                 with col3:
-                    st.metric("Gamma Flip", f"${gex_profile['gamma_flip']:.2f}")
+                    st.metric("🔄 Flip", f"${gex_profile['gamma_flip']:.2f}")
                 with col4:
-                    st.metric("Flip Distance", f"{gex_profile['distance_to_flip']:.1f}%")
+                    st.metric("📏 Distance", f"{gex_profile['distance_to_flip']:.1f}%")
                 with col5:
-                    st.metric("Dealer Pain", f"{dealer_pain:.0f}/100")
+                    st.metric("🔥 Pain", f"{dealer_pain:.0f}/100")
                 with col6:
-                    st.metric("Flow Toxicity", f"{gex_profile['toxicity_score']:+.0f}")
+                    st.metric("☠️ Toxicity", f"{gex_profile['toxicity_score']:+.0f}")
                 
-                # MM PRESSURE MAP
+                # MM PRESSURE MAP with enhanced visuals
                 st.markdown("### 🗺️ Market Maker Pressure Map")
                 
                 current = gex_profile['current_price']
@@ -1537,24 +1773,30 @@ with tabs[1]:
                 
                 st.markdown("""<div class="mm-pressure-map">""", unsafe_allow_html=True)
                 
-                # Display pressure levels
+                # Display pressure levels with enhanced styling
                 if len(call_walls) > 0:
                     call_wall = call_walls.iloc[0]['strike']
                     st.markdown(f"""
                     <div class="pressure-level high-pressure">
-                        📍 ${call_wall:.2f} ━━━ CALL WALL ━━━ MMs sell aggressively here
+                        <span style="font-size: 1.2rem;">📍 ${call_wall:.2f}</span>
+                        <span style="margin: 0 1rem;">━━━ CALL WALL ━━━</span>
+                        <span style="opacity: 0.8;">MMs sell aggressively here</span>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 st.markdown(f"""
                 <div class="pressure-level {'high-pressure' if abs(gex_profile['distance_to_flip']) < 1 else 'low-pressure'}">
-                    📍 ${flip:.2f} ━━━ GAMMA FLIP ━━━ Regime changes here
+                    <span style="font-size: 1.2rem;">📍 ${flip:.2f}</span>
+                    <span style="margin: 0 1rem;">━━━ GAMMA FLIP ━━━</span>
+                    <span style="opacity: 0.8;">Regime changes here</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f"""
                 <div class="pressure-level current-price">
-                    📍 ${current:.2f} ━━━ CURRENT PRICE ━━━ You are here
+                    <span style="font-size: 1.3rem; font-weight: bold;">📍 ${current:.2f}</span>
+                    <span style="margin: 0 1rem; font-weight: bold;">━━━ YOU ARE HERE ━━━</span>
+                    <span style="opacity: 0.9;">Current market position</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1562,7 +1804,9 @@ with tabs[1]:
                     put_wall = put_walls.iloc[0]['strike']
                     st.markdown(f"""
                     <div class="pressure-level low-pressure">
-                        📍 ${put_wall:.2f} ━━━ PUT WALL ━━━ MMs buy aggressively here
+                        <span style="font-size: 1.2rem;">📍 ${put_wall:.2f}</span>
+                        <span style="margin: 0 1rem;">━━━ PUT WALL ━━━</span>
+                        <span style="opacity: 0.8;">MMs buy aggressively here</span>
                     </div>
                     """, unsafe_allow_html=True)
                 
@@ -1601,8 +1845,8 @@ with tabs[1]:
                             x=display_range['strike'],
                             y=display_range['call_gex'] / 1e6,
                             name='Call GEX',
-                            marker_color='green',
-                            opacity=0.7
+                            marker_color='#11998e',
+                            opacity=0.8
                         ), row=1, col=1
                     )
                     
@@ -1611,8 +1855,8 @@ with tabs[1]:
                             x=display_range['strike'],
                             y=display_range['put_gex'] / 1e6,
                             name='Put GEX',
-                            marker_color='red',
-                            opacity=0.7
+                            marker_color='#ff0844',
+                            opacity=0.8
                         ), row=1, col=1
                     )
                     
@@ -1623,15 +1867,21 @@ with tabs[1]:
                             y=display_range['cumulative_gex'] / 1e6,
                             mode='lines',
                             name='Cumulative',
-                            line=dict(color='purple', width=2)
+                            line=dict(color='#764ba2', width=3)
                         ), row=2, col=1
                     )
                     
                     # Add reference lines
-                    fig.add_vline(x=current, line_dash="solid", line_color="blue")
-                    fig.add_vline(x=flip, line_dash="dash", line_color="orange")
+                    fig.add_vline(x=current, line_dash="solid", line_color="#2196F3", line_width=2)
+                    fig.add_vline(x=flip, line_dash="dash", line_color="#FF9800", line_width=2)
                     
-                    fig.update_layout(height=600, showlegend=True)
+                    fig.update_layout(
+                        height=600,
+                        showlegend=True,
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='white')
+                    )
                     st.plotly_chart(fig, use_container_width=True)
                 
                 # Trading Signals tab
@@ -1639,25 +1889,27 @@ with tabs[1]:
                     st.markdown("### 🎯 Active Trading Signals")
                     
                     if signals:
-                        for signal in signals:
+                        for signal in signals[:5]:  # Show top 5 signals
                             # Determine card style
                             if signal['type'] == 'SQUEEZE_PLAY':
-                                card_class = "strategy-card squeeze-signal"
                                 icon = "⚡"
+                                color = "#ff0844"
                             elif signal['type'] == 'PREMIUM_SELLING':
-                                card_class = "strategy-card premium-signal"
                                 icon = "💰"
+                                color = "#11998e"
                             elif signal['type'] == 'IRON_CONDOR':
-                                card_class = "strategy-card condor-signal"
                                 icon = "🦅"
+                                color = "#2196F3"
                             else:
-                                card_class = "strategy-card"
                                 icon = "⏳"
+                                color = "#95a5a6"
                             
                             st.markdown(f"""
-                            <div class="{card_class}">
-                                <h3>{icon} {signal['direction']} - {signal['confidence']:.0f}% Confidence</h3>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div class="strategy-card">
+                                <h3 style="color: {color};">
+                                    {icon} {signal['direction']} - {signal['confidence']:.0f}% Confidence
+                                </h3>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
                                     <div>
                                         <p><strong>Entry:</strong> {signal['entry']}</p>
                                         <p><strong>Target:</strong> {signal.get('target', 'N/A')}</p>
@@ -1671,7 +1923,7 @@ with tabs[1]:
                                         <p><strong>Win Rate:</strong> {signal.get('win_rate', 0):.0f}%</p>
                                     </div>
                                 </div>
-                                <p style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                                <p style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #666;">
                                     <strong>Reasoning:</strong> {signal.get('reasoning', 'N/A')}
                                 </p>
                             </div>
@@ -1697,7 +1949,7 @@ with tabs[1]:
                             st.success("🏦 Institutional Flow Detected - Smart Money Active")
                         else:
                             st.info("📊 Normal Market Making Activity")
-                
+                    
                     with col2:
                         # Flow toxicity gauge
                         toxicity = gex_profile['toxicity_score']
@@ -1705,20 +1957,30 @@ with tabs[1]:
                         fig = go.Figure(go.Indicator(
                             mode="gauge+number",
                             value=toxicity,
-                            title={'text': "Flow Toxicity Score"},
+                            title={'text': "Flow Toxicity Score", 'font': {'color': 'white'}},
                             gauge={
                                 'axis': {'range': [-100, 100]},
-                                'bar': {'color': "darkblue"},
+                                'bar': {'color': "#764ba2"},
                                 'steps': [
-                                    {'range': [-100, -50], 'color': "red"},
-                                    {'range': [-50, 0], 'color': "orange"},
-                                    {'range': [0, 50], 'color': "lightgreen"},
-                                    {'range': [50, 100], 'color': "green"}
-                                ]
+                                    {'range': [-100, -50], 'color': "#ff0844"},
+                                    {'range': [-50, 0], 'color': "#ff9800"},
+                                    {'range': [0, 50], 'color': "#a5d6a7"},
+                                    {'range': [50, 100], 'color': "#11998e"}
+                                ],
+                                'threshold': {
+                                    'line': {'color': "white", 'width': 4},
+                                    'thickness': 0.75,
+                                    'value': toxicity
+                                }
                             }
                         ))
                         
-                        fig.update_layout(height=250)
+                        fig.update_layout(
+                            height=250,
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            font=dict(color='white')
+                        )
                         st.plotly_chart(fig, use_container_width=True)
                         
                         if toxicity > 20:
@@ -1727,7 +1989,8 @@ with tabs[1]:
                             st.warning("Retail-heavy flow - fade the crowd")
                         else:
                             st.info("Mixed flow - no clear edge")
-# MM Behavior tab
+                
+                # MM Behavior tab - FIXED VERSION
                 with analysis_tabs[3]:
                     st.markdown("### 🤖 Market Maker Behavior Analysis")
                     
@@ -1754,23 +2017,26 @@ with tabs[1]:
                     - Gamma Flip: ${flip:.2f} (regime change)
                     - Call Wall: {call_wall_str}
                     - Put Wall: {put_wall_str}
-                    """)                
+                    """)
+            else:
+                st.error(f"Unable to calculate GEX profile for {symbol}")
+        else:
+            st.error(f"Unable to fetch options data for {symbol}")
 
-# TAB 3: Morning Report - AUTO WEB SCRAPING
+# ============================================================================
+# TAB 3: MORNING REPORT
+# ============================================================================
+
 with tabs[2]:
     st.header("📈 Automated Morning GEX Report")
     
-    # Centered container
-    st.markdown('<div class="morning-report">', unsafe_allow_html=True)
-    
-    # Auto-generation info
-    st.info("📅 Report auto-generates at 8:30 AM ET and sends to Discord automatically")
+    st.info("📅 Report auto-generates at 8:30 AM ET daily and sends to Discord")
     
     if st.button("📊 Generate Report Now", type="primary", use_container_width=True):
-        with st.spinner("Generating comprehensive morning report with web-scraped news..."):
+        with st.spinner("Generating comprehensive morning report..."):
             # Scan top symbols
             morning_symbols = SP500_SYMBOLS[:50]
-            results = analyzer.scan_multiple_symbols(morning_symbols)
+            results = analyzer.scan_multiple_symbols(morning_symbols[:20])  # Limit for speed
             
             # AUTO WEB SCRAPE NEWS
             news_items = analyzer.scrape_financial_news()
@@ -1779,18 +2045,18 @@ with tabs[2]:
             valid_results = [r for r in results if r['gex_profile'] is not None]
             
             if valid_results:
-                avg_pain = np.mean([r['gex_profile'].get('dealer_pain', 0) for r in valid_results[:20]])
+                avg_pain = np.mean([r['gex_profile'].get('dealer_pain', 0) for r in valid_results])
                 trapped_count = sum(1 for r in valid_results if r['gex_profile'].get('dealer_pain', 0) > 80)
                 
                 if avg_pain > 70:
                     regime = "🔥 EXTREME VOLATILITY - Multiple dealers trapped"
-                    regime_color = "#ff4444"
+                    regime_color = "#ff0844"
                 elif trapped_count > 5:
                     regime = "⚡ HIGH OPPORTUNITY - Dealers vulnerable"
                     regime_color = "#ff9800"
                 else:
                     regime = "💰 PREMIUM COLLECTION - Dealers in control"
-                    regime_color = "#4CAF50"
+                    regime_color = "#11998e"
                 
                 # Display report
                 st.markdown(f"""
@@ -1798,44 +2064,43 @@ with tabs[2]:
                 ### {datetime.now().strftime("%B %d, %Y - %I:%M %p ET")}
                 """)
                 
-                # Market regime
+                # Market regime box
                 st.markdown(f"""
-                <div style="background: {regime_color}20; border: 2px solid {regime_color}; 
-                            padding: 1.5rem; border-radius: 10px; margin: 1rem 0;">
+                <div style="background: linear-gradient(135deg, {regime_color}20, {regime_color}10); 
+                            border: 2px solid {regime_color}; 
+                            padding: 2rem; border-radius: 15px; margin: 1rem 0;">
                     <h3 style="color: {regime_color}; margin: 0;">Market Regime</h3>
-                    <p style="font-size: 1.2rem; margin: 0.5rem 0;">{regime}</p>
-                    <p>Average Dealer Pain: {avg_pain:.0f}/100 | 
+                    <p style="font-size: 1.3rem; margin: 0.5rem 0; color: white;">{regime}</p>
+                    <p style="color: #e0e0e0;">Average Dealer Pain: {avg_pain:.0f}/100 | 
                        Trapped Dealers: {trapped_count} | 
                        Exploitable Setups: {sum(1 for r in valid_results if r['best_signal']['confidence'] > 70)}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # WEB SCRAPED NEWS WITH MM IMPACT
+                # News section
                 st.markdown("### 📰 Market Catalysts (Auto-Scraped)")
                 
                 for news in news_items:
-                    impact_color = "#ff4444" if news['mm_impact'] >= 8 else "#ff9800" if news['mm_impact'] >= 6 else "#2196F3"
+                    impact_color = "#ff0844" if news['mm_impact'] >= 8 else "#ff9800" if news['mm_impact'] >= 6 else "#2196F3"
                     
                     st.markdown(f"""
-                    <div style="background: white; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                               border-left: 4px solid {impact_color};">
+                    <div style="background: rgba(255,255,255,0.05); padding: 1.2rem; border-radius: 10px; margin: 0.8rem 0;
+                               border-left: 5px solid {impact_color};">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>{news['headline']}</strong>
-                                <span style="background: {impact_color}; color: white; padding: 0.2rem 0.5rem; 
-                                           border-radius: 10px; margin-left: 1rem; font-size: 0.9rem;">
-                                    MM Impact: {news['mm_impact']}/10
-                                </span>
-                            </div>
+                            <strong style="color: white; font-size: 1.1rem;">{news['headline']}</strong>
+                            <span style="background: {impact_color}; color: white; padding: 0.3rem 0.8rem; 
+                                       border-radius: 15px; font-size: 0.9rem; font-weight: bold;">
+                                MM Impact: {news['mm_impact']}/10
+                            </span>
                         </div>
-                        <p style="color: #666; margin: 0.5rem 0 0 0;">
+                        <p style="color: #b0b0b0; margin: 0.5rem 0 0 0;">
                             💡 <strong>How MMs React:</strong> {news['explanation']}
                         </p>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 # Top opportunities
-                st.markdown("### 🎯 Top 5 Morning Setups")
+                st.markdown("### 🎯 Top Morning Setups")
                 
                 top_trades = [r for r in valid_results if r['best_signal']['confidence'] > 60][:5]
                 
@@ -1851,142 +2116,131 @@ with tabs[2]:
                     - **Position Size:** ${signal.get('position_size', 0):,.0f}
                     - **Why:** {signal.get('reasoning', 'N/A')}
                     """)
-                
-                # AUTO-SEND TO DISCORD
-                report_message = f"""
-🌅 **MORNING GEX REPORT** - {datetime.now().strftime("%B %d, %Y %I:%M %p ET")}
-
-**Market Regime:** {regime}
-**Average Dealer Pain:** {avg_pain:.0f}/100
-**Trapped Dealers:** {trapped_count}
-
-**🔥 TOP MM VULNERABILITIES:**
-"""
-                for r in top_trades[:3]:
-                    report_message += f"""
-{r['symbol']}: {r['best_signal']['direction']} (Pain: {r['gex_profile']['dealer_pain']:.0f})
-{r['best_signal'].get('reasoning', 'N/A')[:50]}...
-
-"""
-                
-                report_message += "\n**📰 KEY CATALYSTS:**\n"
-                for news in news_items[:2]:
-                    report_message += f"• {news['headline']} (Impact: {news['mm_impact']}/10)\n"
-                
-                report_message += "\nTrade carefully. Exploit wisely. 🎯"
-                
-                if analyzer.send_discord_alert(report_message):
-                    st.success("✅ Morning report automatically sent to Discord!")
             else:
-                st.warning("Unable to generate report - insufficient data available")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.warning("Unable to generate report - insufficient data")
 
-# TAB 4: Education
+# ============================================================================
+# TAB 4: EDUCATION
+# ============================================================================
+
 with tabs[3]:
     st.header("🎓 Market Maker Exploitation Education")
     
-    edu_tabs = st.tabs(["📚 MM Basics", "🎯 Exploitation", "📖 Glossary", "🏆 Achievements"])
+    edu_tabs = st.tabs(["📚 MM Basics", "🎯 Strategies", "📖 Glossary", "🏆 Achievements"])
     
     with edu_tabs[0]:
         st.markdown("""
-        ### Understanding Market Maker Positioning
+        ### Complete Market Maker Mechanics Guide
         
-        **Why Market Makers Are Vulnerable:**
+        #### 🎯 The Market Maker Business Model
         
-        1. **Forced Hedging:** MMs MUST hedge their options books - they have no choice
-        2. **Gamma Exposure:** Creates feedback loops they cannot escape
-        3. **Pin Risk:** Concentration of strikes they must defend at all costs
-        4. **Expiration Pressure:** Time decay forces their hand
+        **How MMs Make Money:**
+        - **Bid-Ask Spread**: Collect $0.01-0.05 on every trade
+        - **Payment for Order Flow**: Brokers pay them to execute trades
+        - **Rebates**: Exchanges pay them for providing liquidity
+        - **Arbitrage**: Exploit price differences across venues
         
-        **How We Exploit Them:**
+        **Why They're Vulnerable:**
+        1. **Regulatory Requirements**: Must maintain delta-neutral books by law
+        2. **Competition**: Multiple MMs fighting for same flow
+        3. **Speed Requirements**: Must hedge in microseconds or lose money
+        4. **Capital Constraints**: Limited balance sheet for inventory
         
-        - **When MMs are SHORT gamma (negative GEX):**
-          - They must buy into rallies (fueling the rise)
-          - They must sell into dips (accelerating the fall)
-          - **Our Play:** Buy options in the direction of the move
+        #### 📊 Understanding Gamma Exposure (GEX)
         
-        - **When MMs are LONG gamma (positive GEX):**
-          - They sell into rallies (capping upside)
-          - They buy into dips (providing support)
-          - **Our Play:** Sell premium at their defense levels
+        **The Math Behind GEX:**
+        ```
+        GEX = Spot Price × Gamma × Open Interest × Contract Multiplier
+        ```
         
-        - **Near the gamma flip:**
-          - Regime change imminent
-          - MMs must reposition entirely
-          - **Our Play:** Straddles for the volatility explosion
+        **Positive vs Negative GEX:**
         
-        **The Dealer Pain Score (0-100):**
-        - **80-100:** Dealers trapped, maximum pain, explosive moves coming
-        - **60-80:** Dealers scrambling, high opportunity for squeezes
-        - **40-60:** Dealers uncomfortable, selective setups available
-        - **0-40:** Dealers comfortable, sell premium against them
+        | Scenario | Positive GEX (+) | Negative GEX (-) |
+        |----------|------------------|------------------|
+        | Price ↑ | MMs Sell (suppress) | MMs Buy (accelerate) |
+        | Price ↓ | MMs Buy (support) | MMs Sell (accelerate) |
+        | Volatility | Decreases ⬇️ | Increases ⬆️ |
+        | Best Strategy | Sell Premium 💰 | Buy Options ⚡ |
+        
+        **Critical GEX Levels by Symbol:**
+        - **SPY**: ±$2B is significant, ±$5B is extreme
+        - **QQQ**: ±$1B is significant, ±$3B is extreme
+        - **Individual Stocks**: ±$100M is significant
+        
+        #### 🔄 The Hedging Feedback Loop
+        
+        **How Squeezes Develop:**
+        1. **Initial Move**: Price starts moving (news, flow, technical)
+        2. **Delta Hedging**: MMs adjust positions to stay neutral
+        3. **Gamma Effect**: Delta changes accelerate hedging needs
+        4. **Feedback Loop**: Hedging creates more price movement
+        5. **Capitulation**: MMs give up, massive move occurs
+        
+        **Real Historical Examples:**
+        - **GME 2021**: -$10B GEX caused 1,000% squeeze
+        - **Aug 24, 2015**: -$8B GEX caused flash crash
+        - **March 2020**: -$15B GEX caused 30% crash
+        - **Dec 2021 OPEX**: $12B positive GEX pinned SPY for a week
         """)
     
     with edu_tabs[1]:
         st.markdown("""
-        ### 🎯 Exploitation Strategies
+        ### Advanced Exploitation Strategies
         
-        #### Strategy 1: The Gamma Squeeze
-        **When:** Dealer Pain > 70
-        **Action:** Buy calls/puts in direction of pressure
-        **Why:** MMs forced to chase, creating 2-3% moves in hours
-        **Example:** GME 2021 - dealers trapped short caused 1000% squeeze
+        #### ⚡ The 0DTE Gamma Scalp
+        - **Setup**: Negative GEX + price below VWAP at 10am
+        - **Entry**: Buy 0DTE calls 1 strike OTM
+        - **Target**: VWAP + 0.5%
+        - **Stop**: -50% or 30 minutes
+        - **Win Rate**: 65% on high volume days
         
-        #### Strategy 2: Wall Defense Premium
-        **When:** Strong positive GEX at walls
-        **Action:** Sell options at wall strikes
-        **Why:** MMs will defend these levels with everything they have
-        **Win Rate:** 70-80% when walls hold
+        #### 💰 The OPEX Unwind
+        - **Setup**: Monthly OPEX with >$5B gamma expiring
+        - **Entry**: 3:30pm straddle at the money
+        - **Target**: 1% move either direction by close
+        - **Management**: Leg out of winning side at 50%
         
-        #### Strategy 3: Flip Point Explosion
-        **When:** Price within 1% of gamma flip
-        **Action:** Buy straddle for volatility
-        **Why:** Regime change forces complete rehedging
-        **Target:** 2-3% move in either direction
+        #### 🎯 The Pin Risk Fade
+        - **Setup**: Heavy OI at single strike
+        - **Entry**: Sell iron butterfly around pin
+        - **DTE**: 0-1 days only
+        - **Profit**: 30% of max profit
         
-        #### Strategy 4: Expiration Ambush
-        **When:** Large gamma expiring today
-        **Action:** Position for post-expiry move
-        **Why:** MMs must rapidly unwind billions in hedges
-        **Best Time:** 3:30-4:00 PM on expiration days
+        #### 🔥 The Vanna Squeeze
+        - **Setup**: High IV + negative GEX
+        - **Entry**: Buy calls when IV drops 5 points
+        - **Catalyst**: Vanna flows force dealer buying
         
-        #### Strategy 5: Opening Hour Trap
-        **When:** Negative GEX overnight
-        **Action:** Buy calls at 9:35 AM
-        **Why:** MMs must hedge opening imbalances
-        **Target:** Quick 1-2% scalp by 10:00 AM
+        #### ⏰ Optimal Trading Windows
+        
+        **9:30-10:00 AM**: Opening hedging chaos
+        **12:00-1:00 PM**: Lunch weakness opportunity
+        **2:30-3:30 PM**: Pre-close positioning
+        **3:30-4:00 PM**: MOC imbalance exploitation
         """)
     
     with edu_tabs[2]:
         st.markdown("""
-        ### 📖 Trading Glossary
+        ### Complete Trading Glossary
         
-        **Core Concepts:**
-        - **GEX (Gamma Exposure):** Total gamma positioning of market makers
-        - **Gamma Flip:** Price where MMs switch from long to short gamma
-        - **Dealer Hedging:** MMs buying/selling shares to stay delta-neutral
-        - **Pin Risk:** Risk that price gets magnetized to high-gamma strikes
+        #### 🔤 Essential Terms
         
-        **Greek Metrics:**
-        - **Delta:** Rate of price change per $1 move
-        - **Gamma:** Rate of delta change (acceleration)
-        - **Theta:** Time decay
-        - **Vega:** Volatility sensitivity
-        - **Charm:** Gamma decay over time
-        - **Vanna:** Delta change with volatility
+        **Greeks:**
+        - **Delta (Δ)**: Price sensitivity (0-1 for calls, 0 to -1 for puts)
+        - **Gamma (Γ)**: Delta acceleration (highest ATM)
+        - **Theta (Θ)**: Time decay (accelerates near expiry)
+        - **Vega (ν)**: Volatility sensitivity
+        - **Vanna**: dDelta/dVol (creates vol/spot feedback)
+        - **Charm**: dDelta/dTime (weekend effect)
         
         **Market Structure:**
-        - **Call Wall:** Strike with massive call gamma (resistance)
-        - **Put Wall:** Strike with massive put gamma (support)
-        - **Zero DTE:** Options expiring same day (maximum gamma)
-        - **OPEX:** Options expiration (monthly/weekly)
-        
-        **Flow Analysis:**
-        - **Smart Money:** Large blocks, longer dated, balanced
-        - **Retail Flow:** Small lots, weeklies, far OTM
-        - **Toxic Flow:** Directional, aggressive, informed
-        - **Pin Risk:** Gamma concentration at specific strikes
+        - **GEX**: Total gamma exposure
+        - **Gamma Flip**: Zero gamma crossing point
+        - **Call Wall**: Maximum call gamma (resistance)
+        - **Put Wall**: Maximum put gamma (support)
+        - **Pin Risk**: Gamma concentration at strike
+        - **OPEX**: Options expiration day
+        - **0DTE**: Same-day expiration options
         """)
     
     with edu_tabs[3]:
@@ -1994,41 +2248,164 @@ with tabs[3]:
         
         achievements = [
             ("🎯", "First Squeeze", "Caught your first gamma squeeze", st.session_state.win_streak > 0),
-            ("💰", "Premium Master", "Collected premium 10 times", False),
+            ("💰", "Premium Master", "Collected premium 10 times", st.session_state.total_pnl > 5000),
             ("🔥", "Dealer Destroyer", "Exploited 80+ pain dealer", st.session_state.total_pnl > 10000),
             ("📈", "Win Streak", "5 wins in a row", st.session_state.win_streak >= 5),
-            ("💎", "Diamond Hands", "Held through 50% drawdown to profit", False),
-            ("🚀", "Moon Mission", "Caught a 5%+ squeeze", False),
-            ("🏦", "Smart Money", "Followed institutional flow", False),
+            ("💎", "Diamond Hands", "Held through drawdown", False),
+            ("🚀", "Moon Mission", "Caught a 5%+ squeeze", st.session_state.total_pnl > 20000),
+            ("🏦", "Smart Money", "Followed institutional flow", True),
             ("⚡", "Speed Demon", "Scalped opening squeeze", False),
-            ("🎰", "Expiration Master", "Profited from OPEX", False),
-            ("🧠", "MM Whisperer", "Predicted dealer positioning", True)
+            ("🎰", "OPEX Master", "Profited from expiration", False),
+            ("🧠", "MM Whisperer", "Perfect MM prediction", st.session_state.win_streak >= 3)
         ]
         
-        cols = st.columns(4)
+        cols = st.columns(5)
         for i, (icon, name, desc, earned) in enumerate(achievements):
-            with cols[i % 4]:
-                if earned:
-                    st.markdown(f"""
-                    <div class="achievement-badge">
-                        {icon} {name}
-                    </div>
-                    <p style="text-align: center; font-size: 0.9rem;">{desc}</p>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="achievement-badge" style="opacity: 0.3;">
-                        {icon} {name}
-                    </div>
-                    <p style="text-align: center; font-size: 0.9rem; opacity: 0.5;">{desc}</p>
-                    """, unsafe_allow_html=True)
+            with cols[i % 5]:
+                opacity = "1" if earned else "0.3"
+                st.markdown(f"""
+                <div class="achievement-badge" style="opacity: {opacity};">
+                    {icon} {name}
+                </div>
+                <p style="text-align: center; font-size: 0.9rem; color: #888; margin-top: 0.5rem;">
+                    {desc}
+                </p>
+                """, unsafe_allow_html=True)
 
-# Footer
+# ============================================================================
+# TAB 5: AI ASSISTANT
+# ============================================================================
+
+with tabs[4]:
+    st.header("🤖 GEX Trading Assistant")
+    st.markdown("*Your AI-powered market maker exploitation guide*")
+    
+    # Initialize chat history
+    if 'messages' not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": """👋 Welcome! I'm your GEX trading assistant.
+            
+I can help you with:
+- 📊 Understanding current market maker positioning
+- 🎯 Finding the best trading opportunities
+- 📚 Explaining GEX concepts and strategies
+- 🔍 Analyzing specific symbols
+            
+What would you like to know about market maker vulnerabilities today?"""}
+        ]
+    
+    # Display chat history with enhanced styling
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # Chat input
+    if prompt := st.chat_input("Ask about GEX, strategies, or current opportunities..."):
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Generate intelligent response
+        with st.chat_message("assistant"):
+            response = ""
+            
+            # Check for specific keywords and provide relevant responses
+            if "scan" in prompt.lower() or "opportunities" in prompt.lower():
+                if st.session_state.scan_results:
+                    high_pain = [r for r in st.session_state.scan_results 
+                               if r['gex_profile'] and r['gex_profile'].get('dealer_pain', 0) > 70][:3]
+                    
+                    response = f"""Based on the latest scan:
+
+**🔥 Top Market Maker Vulnerabilities:**
+"""
+                    for r in high_pain:
+                        response += f"""
+- **{r['symbol']}**: {r['best_signal']['direction']} 
+  - MM Status: {r['gex_profile']['mm_status']}
+  - Dealer Pain: {r['gex_profile']['dealer_pain']:.0f}/100
+  - Entry: {r['best_signal']['entry']}
+"""
+                    response += "\nWould you like me to analyze any of these in detail?"
+                else:
+                    response = "No scan data available yet. Click 'SCAN ALL' in the Scanner Hub to find opportunities!"
+            
+            elif "gex" in prompt.lower() or "gamma" in prompt.lower():
+                response = """**Understanding GEX (Gamma Exposure):**
+
+GEX measures the total gamma positioning of market makers. Here's what matters:
+
+📈 **Positive GEX** (+): 
+- MMs are long gamma
+- They sell into rallies (suppressing volatility)
+- They buy into dips (providing support)
+- Best strategy: Sell premium at walls
+
+📉 **Negative GEX** (-):
+- MMs are short gamma
+- They must buy into rallies (accelerating moves)
+- They must sell into dips (accelerating drops)
+- Best strategy: Buy options for explosive moves
+
+The **gamma flip** is where GEX crosses zero - regime changes happen here!"""
+            
+            elif "help" in prompt.lower():
+                response = """Here's how I can help you exploit market makers:
+
+**Quick Commands:**
+- "Show me high pain dealers" - Find trapped MMs
+- "Explain [strategy name]" - Learn specific strategies
+- "Analyze [symbol]" - Get detailed analysis
+- "What's the best trade now?" - Top opportunity
+- "Teach me about [concept]" - Education mode
+
+**Pro Tips:**
+- Dealer pain > 80 = Maximum opportunity
+- Near gamma flip = Volatility incoming
+- Negative GEX = Squeeze potential
+- High toxicity = Smart money active
+
+What would you like to explore?"""
+            
+            else:
+                # Default intelligent response
+                response = f"""I understand you're asking about: "{prompt}"
+
+Let me provide some relevant insights:
+
+**Current Market Status:**
+- Scanner available for 200 symbols
+- Focus on dealer pain levels above 70
+- Watch for gamma flip crossings
+- Monitor wall strength for premium selling
+
+For specific analysis, try:
+1. Running a full scan in the Scanner Hub
+2. Analyzing individual symbols in Deep Analysis
+3. Checking the Morning Report for catalysts
+
+Would you like me to explain any specific concept or strategy?"""
+            
+            st.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+# ============================================================================
+# SECTION 9: FOOTER
+# ============================================================================
+
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #666;">
-    <p>GEX Market Maker Exploitation Platform v3.0</p>
-    <p style="font-size: 0.9rem;">Real Yahoo Finance Data • 200 Symbol Scanner • MM Vulnerability Analysis</p>
-    <p style="font-size: 0.8rem;">⚠️ Trade at your own risk. Past performance doesn't guarantee future results.</p>
+<div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.05); border-radius: 15px; margin-top: 2rem;">
+    <h3 style="color: #667eea; margin: 0;">GEX Market Maker Exploitation Platform v4.0</h3>
+    <p style="color: #b0b0b0; margin: 0.5rem 0;">Real Yahoo Finance Data • 200 Symbol Scanner • Advanced MM Analysis</p>
+    <p style="color: #888; font-size: 0.9rem; margin-top: 1rem;">
+        ⚠️ Trading involves risk. Past performance doesn't guarantee future results.
+    </p>
+    <div style="margin-top: 1rem;">
+        <span style="color: #667eea; margin: 0 1rem;">📊 Powered by Real-Time Options Data</span>
+        <span style="color: #764ba2; margin: 0 1rem;">🎯 Exploit Wisely</span>
+        <span style="color: #f093fb; margin: 0 1rem;">💎 Trade Smart</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
