@@ -1263,23 +1263,23 @@ class DealerEdgeAnalyzer:
                 confidence = min(75, 55 + (wall_strength/config['wall_strength_threshold']) * 10)
                 confidence = round(confidence, 2)  # Round to 2 decimal places
                 
-                signals.append({
-                    'type': 'PREMIUM_SELLING',
-                    'direction': 'SELL PUTS',
-                    'strategy_type': strategy_direction,
-                    'confidence': confidence,
-                    'entry': f"Sell puts at ${strongest_put['strike']:.2f}",
-                    'target': "50% profit or expiration",  # FIXED: Added missing target
-                    'stop': f"Price crosses ${strongest_put['strike']:.2f}",
-                    'dte': f"{config['dte_range_puts']['dte': f"{config['dte_range_puts'][0]}-{config['dte_range_puts'][1]} DTE",
-                    'size': f"{self.strategies_config['risk_management']['max_position_size_premium']*100:.0f}%",
-                    'reasoning': f"Strong put wall ({wall_strength/1e6:.0f}M GEX) at {wall_distance:.1f}% below",
-                    'regime': regime_desc,
-                    'expected_move': wall_distance * 0.3,
-                    'time_horizon': "2-5 days",
-                    'win_rate': 75,
-                    'position_size': self.trading_capital * self.strategies_config['risk_management']['max_position_size_premium']
-                })
+signals.append({
+    'type': 'PREMIUM_SELLING',
+    'direction': 'SELL PUTS',
+    'strategy_type': strategy_direction,
+    'confidence': confidence,
+    'entry': f"Sell puts at ${strongest_put['strike']:.2f}",
+    'target': "50% profit or expiration",
+    'stop': f"Price crosses ${strongest_put['strike']:.2f}",
+    'dte': f"{config['dte_range_puts'][0]}-{config['dte_range_puts'][1]} DTE",
+    'size': f"{self.strategies_config['risk_management']['max_position_size_premium']*100:.0f}%",
+    'reasoning': f"Strong put wall ({wall_strength/1e6:.0f}M GEX) at {wall_distance:.1f}% below",
+    'regime': regime_desc,
+    'expected_move': wall_distance * 0.3,
+    'time_horizon': "2-5 days",
+    'win_rate': 75,
+    'position_size': self.trading_capital * self.strategies_config['risk_management']['max_position_size_premium']
+})
         
         return signals
     
